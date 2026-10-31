@@ -1,0 +1,6 @@
+# Request a synchronization session with a remote robot.
+string target_robot_id
+string artifact_id
+---
+bool   success
+string message
