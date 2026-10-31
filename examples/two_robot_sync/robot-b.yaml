@@ -1,0 +1,12 @@
+robot:
+  id: robot-b
+  role: robot
+connection:
+  listen: 127.0.0.1
+  port: 17444
+  peers: 127.0.0.1:17443
+storage:
+  root: /tmp/edge-sync-demo/b
+  database: meta.sqlite
+logging:
+  level: info
