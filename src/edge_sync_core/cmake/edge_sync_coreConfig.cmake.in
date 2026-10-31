@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(edge_sync_base)
+
+include("${CMAKE_CURRENT_LIST_DIR}/edge_sync_coreTargets.cmake")
+
+check_required_components(edge_sync_core)

@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package edge_sync.protocol.v1;
+
+import "v1/manifest.proto";
+import "v1/transfer.proto";
+
+// Sent by a connecting robot to identify itself and negotiate the protocol.
+message HandshakeRequest {
+    string robot_id = 1;
+    string public_key_id = 2;
+    uint32 protocol_version = 3;
+}
+
+message HandshakeResponse {
+    string robot_id = 1;
+    uint32 protocol_version = 2;
+    bool accepted = 3;
+    string reason = 4;   // set when accepted == false
+}
+
+message SyncRequest {
+    string target_robot_id = 1;
+    string artifact_id = 2;
+}
+
+message SyncResult {
+    bool success = 1;
+    string artifact_id = 2;
+    string manifest_id = 3;
+    string error = 4;
+}
+
+// Every remote message is wrapped in an envelope carrying identity and version.
+message MessageEnvelope {
+    string robot_id = 1;
+    string request_id = 2;
+    uint32 protocol_version = 3;
+
+    oneof payload {
+        HandshakeRequest handshake_request = 10;
+        HandshakeResponse handshake_response = 11;
+        SyncRequest sync_request = 12;
+        ManifestRequest manifest_request = 13;
+        ChunkRequest chunk_request = 14;
+        ChunkResponse chunk_response = 15;
+        SyncResult sync_result = 16;
+    }
+}
