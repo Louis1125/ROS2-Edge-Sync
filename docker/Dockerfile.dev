@@ -1,0 +1,33 @@
+ARG ROS_DISTRO=jazzy
+FROM osrf/ros:${ROS_DISTRO}-desktop
+
+# C++ toolchain + project dependencies
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    build-essential \
+    clang \
+    cmake \
+    ninja-build \
+    python3-colcon-common-extensions \
+    libboost-system-dev \
+    libasio-dev \
+    libssl-dev \
+    protobuf-compiler \
+    libprotobuf-dev \
+    libsqlite3-dev \
+    libzstd-dev \
+    libspdlog-dev \
+    libgtest-dev \
+    libbenchmark-dev \
+    clang-format \
+    clang-tidy \
+    gdb \
+    valgrind \
+    ros-${ROS_DISTRO}-rclcpp \
+    ros-${ROS_DISTRO}-rclcpp-lifecycle \
+    ros-${ROS_DISTRO}-lifecycle-msgs \
+    ros-${ROS_DISTRO}-rosidl-default-generators \
+    ros-${ROS_DISTRO}-rmw-fastrtps-cpp \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+CMD ["/bin/bash"]

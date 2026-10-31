@@ -1,0 +1,13 @@
+robot:
+  id: "coordinator-000"
+  role: "coordinator"
+  name: "Fleet Coordinator"
+
+connection:
+  listen: "0.0.0.0"
+  port: 7443
+  tls: { enabled: false }
+
+storage:
+  root: "/var/lib/edge-sync"
+  database: "metadata.sqlite"

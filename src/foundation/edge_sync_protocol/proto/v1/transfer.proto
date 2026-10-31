@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package edge_sync.protocol.v1;
+
+import "v1/common.proto";
+
+message ChunkRequest {
+    string artifact_id = 1;
+    uint64 chunk_index = 2;
+}
+
+message ChunkResponse {
+    string artifact_id = 1;
+    uint64 chunk_index = 2;
+    Chunk chunk = 3;
+    Hash chunk_hash = 4;
+}

@@ -1,0 +1,21 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-24.04
+    container:
+      image: osrf/ros:jazzy-desktop
+    steps:
+      - name: Install clang-format
+        run: |
+          apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            clang-format clang-tidy && rm -rf /var/lib/apt/lists/*
+      - uses: actions/checkout@v4
+      - name: Check formatting
+        run: |
+          find src -name '*.hpp' -o -name '*.cpp' | xargs clang-format --dry-run --Werror

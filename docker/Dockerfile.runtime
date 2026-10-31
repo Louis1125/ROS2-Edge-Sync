@@ -1,0 +1,30 @@
+# --- Build stage ---
+ARG ROS_DISTRO=jazzy
+FROM osrf/ros:${ROS_DISTRO}-desktop AS build
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    build-essential cmake ninja-build python3-colcon-common-extensions \
+    libboost-system-dev libasio-dev libssl-dev protobuf-compiler libprotobuf-dev \
+    libsqlite3-dev libzstd-dev libspdlog-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+COPY . /workspace
+
+RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
+    colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+# --- Runtime stage ---
+FROM osrf/ros:${ROS_DISTRO}-ros-base
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    libprotobuf-dev libsqlite3-dev libzstd-dev libspdlog-dev libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /workspace/install /opt/edge-sync
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENV EDGE_SYNC_HOME=/opt/edge-sync
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["edge_syncd"]

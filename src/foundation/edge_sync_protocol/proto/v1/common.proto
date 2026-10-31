@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package edge_sync.protocol.v1;
+
+message RobotIdentity {
+    string robot_id = 1;
+    string public_key_id = 2;
+}
+
+message Endpoint {
+    string address = 1;
+    uint32 port = 2;
+}
+
+message Hash {
+    string algorithm = 1;   // "sha256" | "blake3"
+    bytes digest = 2;
+}
+
+message Chunk {
+    bytes data = 1;
+    uint64 index = 2;
+    uint64 offset = 3;
+    uint32 length = 4;
+}

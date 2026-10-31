@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>edge_sync_transport_asio</name>
+  <version>0.1.0</version>
+  <description>Boost.Asio TCP/TLS transport implementing the Connection Foundation ITransport interface.</description>
+  <maintainer email="you@example.com">ROS2-Edge-Sync Contributors</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>edge_sync_base</depend>
+  <depend>edge_sync_connection</depend>
+  <depend>libboost-system-dev</depend>
+  <depend>libssl-dev</depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

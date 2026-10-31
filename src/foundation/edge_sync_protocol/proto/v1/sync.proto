@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package edge_sync.protocol.v1;
+
+import "v1/manifest.proto";
+import "v1/transfer.proto";
+
+message SyncRequest {
+    string target_robot_id = 1;
+    string artifact_id = 2;
+}
+
+message SyncResult {
+    bool success = 1;
+    string artifact_id = 2;
+    string manifest_id = 3;
+    string error = 4;
+}
+
+message MessageEnvelope {
+    string robot_id = 1;
+    string request_id = 2;
+    uint32 protocol_version = 3;
+
+    oneof payload {
+        SyncRequest sync_request = 10;
+        ManifestRequest manifest_request = 11;
+        ChunkRequest chunk_request = 12;
+        ChunkResponse chunk_response = 13;
+        SyncResult sync_result = 14;
+    }
+}

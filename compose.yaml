@@ -1,0 +1,109 @@
+services:
+  # Interactive development container.
+  dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+      args:
+        ROS_DISTRO: jazzy
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - build-data:/workspace/build
+      - install-data:/workspace/install
+      - log-data:/workspace/log
+    command: sleep infinity
+
+  # Fast DDS Discovery Server for deterministic ROS 2 node discovery on the
+  # bridge network (replaces the default multicast discovery).
+  discovery:
+    image: osrf/ros:jazzy-ros-base
+    command: >
+      bash -c "source /opt/ros/jazzy/setup.bash &&
+      fastdds discovery --server-id 0 -l 0.0.0.0 -p 11811"
+    networks:
+      - edge-network
+
+  coordinator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.runtime
+      args:
+        ROS_DISTRO: jazzy
+    command:
+      - ros2
+      - run
+      - edge_sync_runtime
+      - edge_syncd
+      - --config
+      - /config/coordinator.yaml
+    volumes:
+      - ./config:/config:ro
+      - coordinator-data:/var/lib/edge-sync
+    environment:
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      FASTRTPS_DEFAULT_PROFILES_FILE: /config/dds/fastdds_discovery.xml
+    depends_on:
+      - discovery
+    networks:
+      - edge-network
+
+  robot-a:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.runtime
+      args:
+        ROS_DISTRO: jazzy
+    command:
+      - ros2
+      - run
+      - edge_sync_runtime
+      - edge_syncd
+      - --config
+      - /config/robot.yaml
+    volumes:
+      - ./config:/config:ro
+      - robot-a-data:/var/lib/edge-sync
+    environment:
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      FASTRTPS_DEFAULT_PROFILES_FILE: /config/dds/fastdds_discovery.xml
+    depends_on:
+      - discovery
+    networks:
+      - edge-network
+
+  robot-b:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.runtime
+      args:
+        ROS_DISTRO: jazzy
+    command:
+      - ros2
+      - run
+      - edge_sync_runtime
+      - edge_syncd
+      - --config
+      - /config/robot.yaml
+    volumes:
+      - ./config:/config:ro
+      - robot-b-data:/var/lib/edge-sync
+    environment:
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      FASTRTPS_DEFAULT_PROFILES_FILE: /config/dds/fastdds_discovery.xml
+    depends_on:
+      - discovery
+    networks:
+      - edge-network
+
+volumes:
+  build-data:
+  install-data:
+  log-data:
+  coordinator-data:
+  robot-a-data:
+  robot-b-data:
+
+networks:
+  edge-network:
+    driver: bridge

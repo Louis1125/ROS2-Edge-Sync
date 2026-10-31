@@ -1,0 +1,30 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  colcon-build:
+    runs-on: ubuntu-24.04
+    container:
+      image: osrf/ros:jazzy-desktop
+    steps:
+      - name: Install dependencies
+        run: |
+          apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build python3-colcon-common-extensions \
+            libboost-system-dev libasio-dev libssl-dev protobuf-compiler libprotobuf-dev \
+            libsqlite3-dev libzstd-dev libspdlog-dev libgtest-dev \
+            && rm -rf /var/lib/apt/lists/*
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          . /opt/ros/jazzy/setup.sh
+          colcon build --event-handlers console_direct+
+      - name: Test
+        run: |
+          . /opt/ros/jazzy/setup.sh
+          colcon test --event-handlers console_direct+
+          colcon test-result --verbose

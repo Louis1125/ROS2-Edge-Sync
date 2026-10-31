@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package edge_sync.protocol.v1;
+
+import "v1/common.proto";
+
+message FileEntry {
+    string path = 1;
+    Hash hash = 2;
+    uint64 size = 3;
+    uint32 chunk_count = 4;
+}
+
+message ArtifactManifest {
+    string artifact_id = 1;
+    string version = 2;
+    repeated FileEntry files = 3;
+}
+
+message ManifestRequest {
+    string artifact_id = 1;
+}

@@ -1,0 +1,36 @@
+# Default Edge-Sync runtime configuration. Override per-role with
+# coordinator.yaml or robot.yaml.
+robot:
+  id: "robot-000"
+  role: "robot"            # robot | coordinator
+  name: "unnamed"
+
+connection:
+  listen: "0.0.0.0"
+  port: 7443
+  tls:
+    enabled: false
+    cert: ""
+    key: ""
+    ca: ""
+  retry:
+    max_attempts: 5
+    base_delay_ms: 100
+    max_delay_ms: 5000
+    backoff_factor: 2.0
+  timeout:
+    connect_ms: 5000
+    request_ms: 10000
+    idle_ms: 60000
+
+storage:
+  root: "/var/lib/edge-sync"
+  database: "metadata.sqlite"
+
+sync:
+  chunk_size: 1048576          # 1 MiB
+  compression: true
+  hash_algorithm: "sha256"
+
+logging:
+  level: "info"
