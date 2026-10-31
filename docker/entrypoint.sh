@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 
 if [ -f "/opt/ros/${ROS_DISTRO}/setup.bash" ]; then
   # shellcheck disable=SC1091

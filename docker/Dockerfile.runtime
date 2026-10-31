@@ -1,11 +1,11 @@
 # --- Build stage ---
-ARG ROS_DISTRO=jazzy
+ARG ROS_DISTRO=humble
 FROM osrf/ros:${ROS_DISTRO}-desktop AS build
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    build-essential cmake ninja-build python3-colcon-common-extensions \
-    libboost-system-dev libasio-dev libssl-dev protobuf-compiler libprotobuf-dev \
-    libsqlite3-dev libzstd-dev libspdlog-dev \
+    build-essential cmake python3-colcon-common-extensions \
+    libboost-system-dev libssl-dev protobuf-compiler libprotobuf-dev \
+    libsqlite3-dev libgtest-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
@@ -18,7 +18,7 @@ RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
 FROM osrf/ros:${ROS_DISTRO}-ros-base
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    libprotobuf-dev libsqlite3-dev libzstd-dev libspdlog-dev libssl-dev \
+    libprotobuf-dev libsqlite3-dev libboost-system-dev libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /workspace/install /opt/edge-sync

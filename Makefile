@@ -1,4 +1,4 @@
-ROS_DISTRO ?= jazzy
+ROS_DISTRO ?= humble
 
 .PHONY: help build test lint docker-build docker-up docker-down clean
 

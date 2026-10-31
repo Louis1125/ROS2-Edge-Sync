@@ -1,0 +1,16 @@
+robot:
+  id: robot-a
+  role: robot
+  name: Robot A
+
+connection:
+  listen: 0.0.0.0
+  port: 7443
+  peers: robot-b:7443
+
+storage:
+  root: /var/lib/edge-sync
+  database: metadata.sqlite
+
+logging:
+  level: info

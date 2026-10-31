@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: docker/Dockerfile.dev
       args:
-        ROS_DISTRO: jazzy
+        ROS_DISTRO: humble
     working_dir: /workspace
     volumes:
       - .:/workspace
@@ -14,37 +14,16 @@ services:
       - log-data:/workspace/log
     command: sleep infinity
 
-  # Fast DDS Discovery Server for deterministic ROS 2 node discovery on the
-  # bridge network (replaces the default multicast discovery).
-  discovery:
-    image: osrf/ros:jazzy-ros-base
-    command: >
-      bash -c "source /opt/ros/jazzy/setup.bash &&
-      fastdds discovery --server-id 0 -l 0.0.0.0 -p 11811"
-    networks:
-      - edge-network
-
   coordinator:
     build:
       context: .
       dockerfile: docker/Dockerfile.runtime
       args:
-        ROS_DISTRO: jazzy
-    command:
-      - ros2
-      - run
-      - edge_sync_runtime
-      - edge_syncd
-      - --config
-      - /config/coordinator.yaml
+        ROS_DISTRO: humble
+    command: ["edge_syncd", "--config", "/config/coordinator.yaml"]
     volumes:
       - ./config:/config:ro
       - coordinator-data:/var/lib/edge-sync
-    environment:
-      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
-      FASTRTPS_DEFAULT_PROFILES_FILE: /config/dds/fastdds_discovery.xml
-    depends_on:
-      - discovery
     networks:
       - edge-network
 
@@ -53,22 +32,11 @@ services:
       context: .
       dockerfile: docker/Dockerfile.runtime
       args:
-        ROS_DISTRO: jazzy
-    command:
-      - ros2
-      - run
-      - edge_sync_runtime
-      - edge_syncd
-      - --config
-      - /config/robot.yaml
+        ROS_DISTRO: humble
+    command: ["edge_syncd", "--config", "/config/robot-a.yaml"]
     volumes:
       - ./config:/config:ro
       - robot-a-data:/var/lib/edge-sync
-    environment:
-      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
-      FASTRTPS_DEFAULT_PROFILES_FILE: /config/dds/fastdds_discovery.xml
-    depends_on:
-      - discovery
     networks:
       - edge-network
 
@@ -77,22 +45,11 @@ services:
       context: .
       dockerfile: docker/Dockerfile.runtime
       args:
-        ROS_DISTRO: jazzy
-    command:
-      - ros2
-      - run
-      - edge_sync_runtime
-      - edge_syncd
-      - --config
-      - /config/robot.yaml
+        ROS_DISTRO: humble
+    command: ["edge_syncd", "--config", "/config/robot-b.yaml"]
     volumes:
       - ./config:/config:ro
       - robot-b-data:/var/lib/edge-sync
-    environment:
-      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
-      FASTRTPS_DEFAULT_PROFILES_FILE: /config/dds/fastdds_discovery.xml
-    depends_on:
-      - discovery
     networks:
       - edge-network
 

@@ -1,13 +1,16 @@
 robot:
-  id: "coordinator-000"
-  role: "coordinator"
-  name: "Fleet Coordinator"
+  id: coordinator-000
+  role: coordinator
+  name: Fleet Coordinator
 
 connection:
-  listen: "0.0.0.0"
+  listen: 0.0.0.0
   port: 7443
-  tls: { enabled: false }
+  peers: ""
 
 storage:
-  root: "/var/lib/edge-sync"
-  database: "metadata.sqlite"
+  root: /var/lib/edge-sync
+  database: metadata.sqlite
+
+logging:
+  level: info
