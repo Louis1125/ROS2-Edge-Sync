@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>edge_sync_runtime</name>
+  <version>0.1.0</version>
+  <description>Composition root: the edge_syncd daemon that wires configuration, storage and the connection foundation.</description>
+  <maintainer email="you@example.com">ROS2-Edge-Sync Contributors</maintainer>
+  <license>MIT</license>
+
+  <depend>edge_sync_base</depend>
+  <depend>edge_sync_protocol</depend>
+  <depend>edge_sync_core</depend>
+  <depend>edge_sync_connection</depend>
+  <depend>edge_sync_connection_asio</depend>
+  <depend>edge_sync_storage</depend>
+
+  <export>
+    <build_type>cmake</build_type>
+  </export>
+</package>
