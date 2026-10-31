@@ -1,0 +1,11 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(edge_sync_base)
+find_dependency(edge_sync_protocol)
+find_dependency(edge_sync_connection)
+find_dependency(Boost)
+
+include("${CMAKE_CURRENT_LIST_DIR}/edge_sync_connection_asioTargets.cmake")
+
+check_required_components(edge_sync_connection_asio)
