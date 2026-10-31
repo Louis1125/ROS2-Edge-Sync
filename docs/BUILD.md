@@ -2,39 +2,40 @@
 
 ## Prerequisites
 
-- ROS 2 Jazzy (Ubuntu 24.04) — `ROS_DISTRO` is a build arg, default `jazzy`.
-- CMake ≥ 3.20, C++20 compiler (GCC or Clang), colcon.
+- ROS 2 (Humble by default; `ROS_DISTRO` is a build arg — Jazzy/Lyrical supported).
+- CMake ≥ 3.20, C++20 compiler, colcon.
+- protobuf, Boost (headers), SQLite3, GTest.
 
-## Docker (recommended)
+## Build (colcon)
 
 ```bash
-docker compose build dev
-docker compose run --rm dev bash
-# inside the container:
-colcon build --symlink-install
-colcon test && colcon test-result --verbose
+source /opt/ros/$ROS_DISTRO/setup.bash
+colcon build          # builds all 8 packages
+colcon test           # runs unit + integration tests
+colcon test-result --verbose
 ```
 
-## Native
+ROS-independent packages use plain CMake (no ROS needed); the ROS adapter
+packages (`edge_sync_interfaces`, `edge_sync_ros2`) use ament_cmake.
+
+## Docker (dev)
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-rosdep install --from-paths src --ignore-src -r -y
-colcon build --symlink-install
-source install/setup.bash
-ros2 pkg list | grep edge_sync
+docker build -f docker/Dockerfile.dev -t edge-sync-dev --build-arg ROS_DISTRO=humble .
+docker run --rm -v $PWD:/workspace -w /workspace edge-sync-dev bash -c \
+  'source /opt/ros/humble/setup.bash && colcon build'
 ```
 
-## Build types
+## Docker (runtime)
 
 ```bash
-colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
-colcon build --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
+docker build -f docker/Dockerfile.runtime -t ros2-edge-sync --build-arg ROS_DISTRO=humble .
+# multi-stage: builds in osrf/ros, ships a minimal ros-base image with /opt/edge-sync
 ```
 
-## Running
+## Two-robot demo
 
 ```bash
-source install/setup.bash
-ros2 run edge_sync_runtime edge_syncd --config config/robot.yaml
+# inside the dev container, after colcon build:
+bash examples/two_robot_sync/run.sh
 ```
