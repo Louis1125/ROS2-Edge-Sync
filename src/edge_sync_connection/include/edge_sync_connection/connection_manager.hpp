@@ -41,6 +41,11 @@ public:
 
     void set_local_identity(std::string robot_id, std::string public_key_id = {});
 
+    // Enable handshake authentication: outbound connections present
+    // HMAC-SHA256(secret, robot_id); inbound connections are rejected if it does
+    // not verify. An empty secret disables authentication.
+    void set_shared_secret(std::string secret);
+
     edge_sync::base::Result<void> start(const Endpoint& listen_endpoint);
     edge_sync::base::Result<void> connect_peer(const Endpoint& endpoint);
 
@@ -80,6 +85,7 @@ private:
 
     std::string local_robot_id_;
     std::string local_public_key_id_;
+    std::string shared_secret_;
 
     std::map<ConnectionId, Peer> peers_;              // conn -> peer (after handshake)
     std::map<ConnectionId, Endpoint> endpoints_;      // conn -> remote endpoint

@@ -1,5 +1,7 @@
 #include "edge_sync_connection/connection_manager.hpp"
 
+#include "edge_sync_base/hmac.hpp"
+
 #include <condition_variable>
 #include <mutex>
 #include <utility>
@@ -38,6 +40,10 @@ void ConnectionManager::set_local_identity(std::string robot_id, std::string pub
     local_public_key_id_ = std::move(public_key_id);
 }
 
+void ConnectionManager::set_shared_secret(std::string secret) {
+    shared_secret_ = std::move(secret);
+}
+
 edge_sync::base::Result<void> ConnectionManager::start(const Endpoint& listen_endpoint) {
     return transport_->start(listen_endpoint);
 }
@@ -58,6 +64,9 @@ edge_sync::base::Result<void> ConnectionManager::connect_peer(const Endpoint& en
     req->set_robot_id(local_robot_id_);
     req->set_public_key_id(local_public_key_id_);
     req->set_protocol_version(edge_sync::protocol::kProtocolVersion);
+    if (!shared_secret_.empty()) {
+        req->set_auth_token(edge_sync::base::hmac_sha256(shared_secret_, local_robot_id_));
+    }
     send_envelope(id, env);
 
     logger_.log(edge_sync::base::LogLevel::Info,
@@ -166,6 +175,19 @@ void ConnectionManager::handle_handshake_request(ConnectionId id, const Endpoint
         logger_.log(edge_sync::base::LogLevel::Error,
                     "rejected handshake from " + req.robot_id() + ": version mismatch");
         return;
+    }
+
+    if (!shared_secret_.empty()) {
+        const auto expected = edge_sync::base::hmac_sha256(shared_secret_, req.robot_id());
+        if (req.auth_token() != expected) {
+            hr->set_accepted(false);
+            hr->set_reason("authentication failed");
+            send_envelope(id, resp);
+            transport_->close(id);
+            logger_.log(edge_sync::base::LogLevel::Error,
+                        "rejected handshake from '" + req.robot_id() + "': authentication failed");
+            return;
+        }
     }
 
     auto& peer = peers_[id];
