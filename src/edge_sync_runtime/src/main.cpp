@@ -3,6 +3,8 @@
 #include <csignal>
 #include <cstdint>
 #include <cstdio>
+#include <fstream>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -15,6 +17,7 @@
 #include "edge_sync_connection/connection_manager.hpp"
 #include "edge_sync_connection/sync_peer_adapter.hpp"
 #include "edge_sync_connection/tcp_transport.hpp"
+#include "edge_sync_core/manifest_builder.hpp"
 #include "edge_sync_core/sync_engine.hpp"
 #include "edge_sync_storage/artifact_repository.hpp"
 #include "edge_sync_storage/artifact_store.hpp"
@@ -92,6 +95,41 @@ int main(int argc, char** argv) {
     if (auto r = artifact_store.initialize(); !r) {
         logger.log(base::LogLevel::Error, "artifact store: " + r.error().message);
         return 1;
+    }
+
+    // --seed <file> [--artifact <id>]: publish an artifact then exit.
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--seed" && i + 1 < argc) {
+            const std::string file = argv[++i];
+            std::string artifact_id = "artifact";
+            for (int j = 1; j < argc; ++j) {
+                if (std::string(argv[j]) == "--artifact" && j + 1 < argc) artifact_id = argv[++j];
+            }
+            std::ifstream in(file, std::ios::binary);
+            base::ByteBuffer data((std::istreambuf_iterator<char>(in)),
+                                  std::istreambuf_iterator<char>());
+            auto manifest = core::build_manifest(artifact_id, {1, 0, 0}, data, 65536);
+            if (!manifest) {
+                std::fprintf(stderr, "seed: %s\n", manifest.error().message.c_str());
+                return 1;
+            }
+            for (const auto& c : manifest.value().chunks) {
+                base::ByteBuffer chunk(data.begin() + static_cast<std::ptrdiff_t>(c.offset),
+                                       data.begin() + static_cast<std::ptrdiff_t>(c.offset + c.size));
+                if (auto r = objects.put(chunk); !r) {
+                    std::fprintf(stderr, "seed: %s\n", r.error().message.c_str());
+                    return 1;
+                }
+            }
+            if (auto r = repository.store(manifest.value()); !r) {
+                std::fprintf(stderr, "seed: %s\n", r.error().message.c_str());
+                return 1;
+            }
+            std::printf("seeded artifact=%s version=1.0.0 hash=%s chunks=%zu\n",
+                        artifact_id.c_str(), manifest.value().artifact_hash.c_str(),
+                        manifest.value().chunks.size());
+            return 0;
+        }
     }
 
     // --- data plane (peer) connection + sync engine ---
