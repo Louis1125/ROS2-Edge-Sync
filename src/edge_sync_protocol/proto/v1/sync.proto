@@ -32,6 +32,22 @@ message SyncResult {
     string error = 4;
 }
 
+// A command dispatched by the control plane to a robot agent: "run a sync of
+// this artifact from this source". Commands are idempotent by command_id.
+message SyncCommand {
+    string command_id = 1;
+    string source_robot = 2;
+    string artifact_id = 3;
+}
+
+// Execution status reported back by the robot. Delivery state (acknowledged)
+// and execution state (succeeded/failed) are tracked separately.
+message SyncStatusReport {
+    string command_id = 1;
+    string status = 2;   // acknowledged | running | succeeded | failed | cancelled
+    string error = 3;
+}
+
 // Every remote message is wrapped in an envelope carrying identity and version.
 message MessageEnvelope {
     string robot_id = 1;
@@ -48,5 +64,7 @@ message MessageEnvelope {
         ChunkRequest chunk_request = 22;
         ChunkData chunk_data = 23;
         ChunkAck chunk_ack = 24;
+        SyncCommand sync_command = 25;
+        SyncStatusReport sync_status_report = 26;
     }
 }
