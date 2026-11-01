@@ -92,7 +92,8 @@ private:
     std::uint64_t next_request_id_{1};
     std::mutex pending_mu_;
     std::map<std::string,
-             std::shared_ptr<std::promise<edge_sync::protocol::MessageEnvelope>>> pending_;
+             std::shared_ptr<std::promise<
+                 edge_sync::base::Result<edge_sync::protocol::MessageEnvelope>>>> pending_;
 
     RetryPolicy retry_;
     TimeoutConfig timeouts_;

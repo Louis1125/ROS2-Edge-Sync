@@ -14,6 +14,8 @@ void sleep_for(std::chrono::milliseconds duration, const std::stop_token& stop) 
     cv.wait_for(lk, stop, duration, [] { return false; });
 }
 
+constexpr std::size_t kMaxPendingRequests = 1024;
+
 std::string endpoint_string(const Endpoint& e) {
     return e.address + ":" + std::to_string(e.port);
 }
@@ -75,10 +77,15 @@ edge_sync::base::Result<edge_sync::protocol::MessageEnvelope> ConnectionManager:
     const std::string request_id = std::to_string(next_request_id_++);
     envelope.set_request_id(request_id);
 
-    auto promise = std::make_shared<std::promise<edge_sync::protocol::MessageEnvelope>>();
+    using Pending = std::promise<edge_sync::base::Result<edge_sync::protocol::MessageEnvelope>>;
+    auto promise = std::make_shared<Pending>();
     auto future = promise->get_future();
     {
         std::lock_guard lk(pending_mu_);
+        if (pending_.size() >= kMaxPendingRequests) {
+            return edge_sync::base::Error{edge_sync::base::ErrorCode::Internal,
+                                          "too many pending requests"};
+        }
         pending_[request_id] = std::move(promise);
     }
 
@@ -115,7 +122,8 @@ void ConnectionManager::on_message(ConnectionId id, ByteBuffer data) {
         std::lock_guard lk(pending_mu_);
         const auto it = pending_.find(env.request_id());
         if (it != pending_.end()) {
-            it->second->set_value(env);
+            it->second->set_value(
+                edge_sync::base::Result<edge_sync::protocol::MessageEnvelope>{env});
             pending_.erase(it);
             return;
         }
@@ -305,6 +313,15 @@ void ConnectionManager::stop() {
         if (t.joinable()) t.join();
     }
     reconnect_threads_.clear();
+    {
+        std::lock_guard lk(pending_mu_);
+        for (auto& [id, p] : pending_) {
+            p->set_value(edge_sync::base::Result<edge_sync::protocol::MessageEnvelope>{
+                edge_sync::base::Error{edge_sync::base::ErrorCode::ConnectionFailed,
+                                       "connection manager stopped"}});
+        }
+        pending_.clear();
+    }
     conn_by_robot_.clear();
     sessions_.clear();
     peers_.clear();
