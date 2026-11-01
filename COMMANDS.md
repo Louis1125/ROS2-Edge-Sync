@@ -18,7 +18,7 @@ Open the web console at **http://localhost:5173** (API at **:8080**).
 ## The four commands
 
 ```bash
-./edge-sync up       # start the platform (local Docker by default)
+./edge-sync up --open  # start the platform and open the dashboard (local by default)
 ./edge-sync status   # mode, services, database, robots, sync jobs
 ./edge-sync doctor   # diagnose the environment with corrective suggestions
 ./edge-sync down     # stop cleanly (preserves data; --reset deletes it)

@@ -1,130 +1,227 @@
 #!/usr/bin/env bash
-# ROS2-Edge-Sync unified entry point: up / down / status / doctor.
-#   ./edge-sync up [--mode local|edge|production]
-#   ./edge-sync down [--mode ...]    (preserves data unless --reset)
-#   ./edge-sync status [--mode ...]
-#   ./edge-sync doctor [--mode ...]
+# ROS2-Edge-Sync — unified entry point (up / down / status / doctor).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MODE=local
-CMD=help
-RESET=0
+MODE=local; CMD=help; RESET=0; OPEN=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --mode) MODE="$2"; shift 2 ;;
     --reset) RESET=1; shift ;;
+    --open) OPEN=1; shift ;;
     up|down|status|doctor|help|version) CMD="$1"; shift ;;
     *) echo "error: unknown argument '$1'"; exit 2 ;;
   esac
 done
+case "$MODE" in local|edge|production) : ;; *) echo "error: --mode must be local|edge|production"; exit 2 ;; esac
 
-case "$MODE" in
-  local|edge|production) : ;;
-  *) echo "error: --mode must be local|edge|production"; exit 2 ;;
-esac
+# --- output helpers (colors only on an interactive terminal) ---
+if [ -t 1 ]; then
+  C_GREEN=$'\033[32m'; C_RED=$'\033[31m'; C_DIM=$'\033[2m'; C_OFF=$'\033[0m'
+else
+  C_GREEN=''; C_RED=''; C_DIM=''; C_OFF=''
+fi
+ok()   { printf '%s✓%s %s\n' "$C_GREEN" "$C_OFF" "$*"; }
+bad()  { printf '%s✗%s %s\n' "$C_RED" "$C_OFF" "$*" >&2; }
+info() { printf '%s[edge-sync]%s %s\n' "$C_DIM" "$C_OFF" "$*"; }
+die()  { bad "$*"; exit 1; }
 
-log()  { echo "[edge-sync] $*"; }
-die()  { echo "error: $*" >&2; exit 1; }
-need() { command -v "$1" >/dev/null 2>&1 || die "$1 is required but not installed"; }
+# staged progress
+_P=0; _T=1
+begin_phases() { _T=$1; _P=0; }
+phase() { _P=$((_P+1)); printf '\n[%d/%d] %s\n' "$_P" "$_T" "$*"; }
 
-# --- local (Docker) backend ---
-local_images() {
-  docker image inspect edge-sync-drogon-base >/dev/null 2>&1 || \
-    docker build -f docker/drogon-base.Dockerfile -t edge-sync-drogon-base "$ROOT"
-  docker image inspect edge-sync-cp-runtime >/dev/null 2>&1 || \
-    docker build -f docker/control-plane.Dockerfile -t edge-sync-cp-runtime "$ROOT"
+# run a command with real output flowing (so build/download progress shows).
+# On failure, print the phase name + exit.
+run() {
+  "$@"
 }
 
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# --- URL discovery (from actual published docker ports) ---
+published_port() {  # container port -> host port
+  local c="$1" p="$2"
+  docker port "$c" "$p" 2>/dev/null | head -1 | sed 's/.*://'
+}
+
+# --- local (Docker) ---
+local_image_ok() { docker image inspect "$1" >/dev/null 2>&1; }
+
 local_up() {
-  need docker
-  local_images
+  have docker || die "Docker is required (install Docker, then re-run)"
+  docker info >/dev/null 2>&1 || die "Docker daemon is not running (start it, then re-run)"
+
+  begin_phases 8
+
+  phase "Check prerequisites"
+  local need_build_drogon=0 need_build_cpp=0
+  local_image_ok edge-sync-drogon-base || need_build_drogon=1
+  local_image_ok edge-sync-cp-runtime || need_build_cpp=1
+  ok "prerequisites checked"
+
+  phase "Base images (Drogon + runtime deps)"
+  if [ "$need_build_drogon" = 1 ]; then
+    run docker build -f docker/drogon-base.Dockerfile -t edge-sync-drogon-base "$ROOT"
+    ok "built edge-sync-drogon-base"
+  else
+    info "reusing cached edge-sync-drogon-base"
+  fi
+  if [ "$need_build_cpp" = 1 ]; then
+    run docker build -f docker/control-plane.Dockerfile -t edge-sync-cp-runtime "$ROOT"
+    ok "built edge-sync-cp-runtime"
+  else
+    info "reusing cached edge-sync-cp-runtime"
+  fi
+
+  phase "C++ data plane build"
+  if [ -f "$ROOT/install/edge_sync_runtime/bin/edge_syncd" ]; then
+    info "reusing existing data-plane build"
+  else
+    run docker run --rm -v "$ROOT":/workspace -w /workspace \
+      engineai_robotics_env:humble-desktop-local bash -c \
+      'source /opt/ros/humble/setup.bash && colcon build'
+    ok "data plane built"
+  fi
+
+  phase "Control plane build"
+  if [ -f "$ROOT/build/control/edge_sync_control_plane" ]; then
+    info "reusing existing control-plane build"
+  else
+    run docker run --rm --entrypoint /bin/bash -v "$ROOT":/workspace -w /workspace \
+      edge-sync-cp-runtime -c \
+      'cmake -B build/control -S apps/edge_sync_control_plane \
+        -DCMAKE_PREFIX_PATH="/opt/drogon;/workspace/install/edge_sync_base;/workspace/install/edge_sync_core;/workspace/install/edge_sync_protocol;/workspace/install/edge_sync_connection;/workspace/install/edge_sync_connection_asio" \
+        -DCMAKE_BUILD_TYPE=Release && cmake --build build/control -j2'
+    ok "control plane built"
+  fi
+
+  phase "Start PostgreSQL"
   docker network create edge-sync-net 2>/dev/null || true
   docker rm -f edge-sync-pg edge-sync-cp edge-sync-web 2>/dev/null || true
-
   docker run -d --name edge-sync-pg --network edge-sync-net \
     -e POSTGRES_DB=edge_sync -e POSTGRES_USER=edge_sync \
     -e POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-edge_sync}" \
     -v edge-sync-pgdata:/var/lib/postgresql/data postgres:16-alpine >/dev/null
+  local pg_ok=0
+  for i in $(seq 1 30); do
+    docker exec edge-sync-pg pg_isready -U edge_sync >/dev/null 2>&1 && { pg_ok=1; break; }
+    sleep 1
+  done
+  [ "$pg_ok" = 1 ] || { bad "PostgreSQL did not become ready"; docker logs edge-sync-pg | tail -15; exit 1; }
+  ok "PostgreSQL ready"
 
-  # control plane: needs the built data-plane + control-plane binaries
-  local_build
+  phase "Start control plane (runs migrations)"
   docker run -d --name edge-sync-cp --network edge-sync-net -p 8080:8080 \
     --entrypoint /bin/bash -v "$ROOT":/workspace edge-sync-cp-runtime -c '
       export LD_LIBRARY_PATH=/opt/drogon/lib:/workspace/install/edge_sync_base/lib:/workspace/install/edge_sync_core/lib:/workspace/install/edge_sync_protocol/lib:/workspace/install/edge_sync_connection/lib:/workspace/install/edge_sync_connection_asio/lib:$LD_LIBRARY_PATH
       export MIGRATIONS_DIR=/workspace/apps/edge_sync_control_plane/migrations
       export DATABASE_URL="host=edge-sync-pg port=5432 dbname=edge_sync user=edge_sync password='"${POSTGRES_PASSWORD:-edge_sync}"'"
       export EDGE_SYNC_FLEET_SECRET="'"${EDGE_SYNC_FLEET_SECRET:-change-me}"'"
+      export EDGE_SYNC_ADMIN_TOKEN="'"${EDGE_SYNC_ADMIN_TOKEN:-}"'"
       exec /workspace/build/control/edge_sync_control_plane' >/dev/null
+  local cp_ok=0
+  for i in $(seq 1 30); do
+    curl -fsS http://localhost:8080/api/v1/health >/dev/null 2>&1 && { cp_ok=1; break; }
+    sleep 1
+  done
+  [ "$cp_ok" = 1 ] || { bad "control plane not healthy"; docker logs edge-sync-cp | tail -15; exit 1; }
+  ok "control plane healthy (migrations applied)"
 
-  # frontend (Vite dev server proxying /api to the control plane)
+  phase "Start web console"
   docker run -d --name edge-sync-web --network edge-sync-net -p 5173:5173 \
     -e VITE_API_TARGET=http://edge-sync-cp:8080 \
     -v "$ROOT/web":/app -w /app node:20-alpine \
-    sh -c 'npm install >/dev/null 2>&1 && npx vite --host --port 5173' >/dev/null
+    sh -c 'npm install --no-audit --no-fund >/dev/null 2>&1 && npx vite --host --port 5173' >/dev/null
+  ok "web console started"
 
-  # wait for control-plane health
+  phase "Verify readiness and discover URLs"
+  local web_ok=0
   for i in $(seq 1 30); do
-    curl -fsS http://localhost:8080/api/v1/health >/dev/null 2>&1 && break
+    curl -fsS http://localhost:5173/ >/dev/null 2>&1 && { web_ok=1; break; }
     sleep 1
   done
-  curl -fsS http://localhost:8080/api/v1/health >/dev/null 2>&1 || die "control plane did not become healthy"
+  local api_port web_port
+  api_port=$(published_port edge-sync-cp 8080); api_port="${api_port:-8080}"
+  web_port=$(published_port edge-sync-web 5173); web_port="${web_port:-5173}"
+  local api_url="http://localhost:${api_port}"
+  local web_url="http://localhost:${web_port}"
+  [ "$web_ok" = 1 ] || info "web console still starting; open $web_url shortly"
 
-  log "control plane: http://localhost:8080  (health: ok)"
-  log "web console:   http://localhost:5173"
-  log "enroll a robot: run the robot daemon with control_plane.host/port set (see COMMANDS.md)"
-}
+  echo
+  ok "ROS2-Edge-Sync is ready"
+  info "API:          $api_url/api/v1/health"
+  info "Web console:  $web_url"
+  info "Gateway port: 7443 (robot agents connect here)"
 
-local_build() {
-  if [ ! -f "$ROOT/install/edge_sync_runtime/bin/edge_syncd" ] || [ ! -f "$ROOT/build/control/edge_sync_control_plane" ]; then
-    log "building C++ packages (first time)…"
-    docker run --rm -v "$ROOT":/workspace -w /workspace \
-      engineai_robotics_env:humble-desktop-local bash -c \
-      'source /opt/ros/humble/setup.bash && colcon build' >/dev/null
-    docker run --rm --entrypoint /bin/bash -v "$ROOT":/workspace -w /workspace edge-sync-cp-runtime -c \
-      'cmake -B build/control -S apps/edge_sync_control_plane -DCMAKE_PREFIX_PATH="/opt/drogon;/workspace/install/edge_sync_base;/workspace/install/edge_sync_core;/workspace/install/edge_sync_protocol;/workspace/install/edge_sync_connection;/workspace/install/edge_sync_connection_asio" -DCMAKE_BUILD_TYPE=Release >/dev/null 2>&1 && cmake --build build/control -j2' >/dev/null
+  if [ "$OPEN" = 1 ]; then
+    (xdg-open "$web_url" 2>/dev/null || open "$web_url" 2>/dev/null || start "$web_url" 2>/dev/null) \
+      || info "could not open a browser automatically — open $web_url manually"
   fi
 }
 
 local_down() {
-  need docker
-  docker rm -f edge-sync-pg edge-sync-cp edge-sync-web 2>/dev/null || true
-  if [ "$RESET" = "1" ]; then
+  have docker || die "Docker is required"
+  begin_phases 2
+  phase "Stop services"
+  docker rm -f edge-sync-web edge-sync-cp edge-sync-pg 2>/dev/null || true
+  ok "services stopped"
+  phase "Persistent data"
+  if [ "$RESET" = 1 ]; then
     docker volume rm edge-sync-pgdata 2>/dev/null || true
-    log "stopped and removed persistent data (--reset)"
+    ok "PostgreSQL data removed (--reset)"
   else
-    log "stopped; PostgreSQL data preserved (use --reset to delete)"
+    ok "PostgreSQL data preserved (use --reset to delete)"
   fi
 }
 
 local_status() {
-  need docker
-  docker ps --filter name=edge-sync- --format 'table {{.Names}}\t{{.Status}}'
-  echo "--- control plane ---"
-  curl -s http://localhost:8080/api/v1/health || echo "(unreachable)"
+  have docker || die "Docker is required"
+  echo "mode: local"
   echo
-  echo "--- robots ---"
-  curl -s http://localhost:8080/api/v1/robots || echo "(unreachable)"
+  for c in edge-sync-pg edge-sync-cp edge-sync-web; do
+    local state
+    state=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo "stopped")
+    printf '  %-14s %s\n' "$c" "$state"
+  done
+  local api_port
+  api_port=$(published_port edge-sync-cp 8080)
+  if [ -n "$api_port" ]; then
+    local health
+    health=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${api_port}/api/v1/health" 2>/dev/null || echo "unreachable")
+    echo "  API: http://localhost:${api_port} (health: $health)"
+  fi
+  local web_port
+  web_port=$(published_port edge-sync-web 5173)
+  if [ -n "$web_port" ]; then
+    echo "  Web: http://localhost:${web_port}"
+  fi
   echo
-  echo "--- sync jobs ---"
-  curl -s http://localhost:8080/api/v1/sync-jobs || echo "(unreachable)"
-  echo
+  if curl -fsS "http://localhost:${api_port:-8080}/api/v1/health" >/dev/null 2>&1; then
+    echo "--- robots ---"; curl -s "http://localhost:${api_port:-8080}/api/v1/robots" || true; echo
+    echo "--- sync jobs ---"; curl -s "http://localhost:${api_port:-8080}/api/v1/sync-jobs" || true; echo
+  fi
 }
 
 local_doctor() {
-  need docker
-  docker info >/dev/null 2>&1 || die "Docker daemon is not running"
+  have docker || { echo "FAIL Docker not installed"; return 1; }
+  docker info >/dev/null 2>&1 || { echo "FAIL Docker daemon not running"; return 1; }
   echo "OK   docker"
-  docker image inspect edge-sync-cp-runtime >/dev/null 2>&1 && echo "OK   control-plane image" || echo "WARN control-plane image missing (run: ./edge-sync up)"
-  docker image inspect postgres:16-alpine >/dev/null 2>&1 && echo "OK   postgres image" || echo "WARN postgres image missing (will pull on up)"
-  if curl -fsS http://localhost:8080/api/v1/health >/dev/null 2>&1; then echo "OK   control plane healthy"; else echo "WARN control plane not running (run: ./edge-sync up)"; fi
-  if [ -f "$ROOT/install/edge_sync_runtime/bin/edge_syncd" ]; then echo "OK   data-plane build present"; else echo "WARN data-plane not built (run: ./edge-sync up)"; fi
+  local_image_ok edge-sync-drogon-base && echo "OK   drogon base image" || echo "WARN drogon base image missing (./edge-sync up builds it)"
+  local_image_ok edge-sync-cp-runtime && echo "OK   control-plane runtime image" || echo "WARN control-plane runtime image missing"
+  [ -f "$ROOT/install/edge_sync_runtime/bin/edge_syncd" ] && echo "OK   data-plane build" || echo "WARN data-plane not built"
+  [ -f "$ROOT/build/control/edge_sync_control_plane" ] && echo "OK   control-plane build" || echo "WARN control-plane not built"
+  # port conflicts
+  for p in 8080 5173; do
+    if (ss -ltn 2>/dev/null || netstat -ltn 2>/dev/null) | grep -q ":$p "; then
+      echo "WARN port $p appears in use (a non-edge-sync process may conflict)"
+    fi
+  done
+  if curl -fsS http://localhost:8080/api/v1/health >/dev/null 2>&1; then echo "OK   control plane healthy"; else echo "WARN control plane not running (./edge-sync up)"; fi
 }
 
-# --- k3s backend (delegates to scripts/k3s) ---
 k3s_delegate() {
-  local op="$1"
-  case "$op" in
+  case "$1" in
     up) bash "$ROOT/scripts/k3s/install.sh" "$MODE" ;;
     down) bash "$ROOT/scripts/k3s/uninstall.sh" ;;
     status) bash "$ROOT/scripts/k3s/status.sh" ;;
@@ -136,21 +233,18 @@ help_text() {
   cat <<EOF
 ROS2-Edge-Sync — unified entry point
 
-Usage: ./edge-sync <command> [--mode local|edge|production]
+Usage: ./edge-sync <command> [--mode local|edge|production] [--open]
 
 Commands:
-  up       start the platform (build/pull images, migrate, wait for health)
+  up       start the platform (build/pull images, migrate, wait for readiness)
   down     stop cleanly (preserves data unless --reset)
-  status   show mode, service health, database, gateway, robots, jobs
+  status   service states, API/web URLs, robots, sync jobs
   doctor   diagnose the environment with corrective suggestions
 
-Modes:
-  local       Docker Compose-style local deployment (default)
-  edge        single K3s edge server via Helm
-  production  Kubernetes deployment with external PostgreSQL + TLS (Helm)
+Modes:  local (Docker, default) | edge (K3s) | production (Kubernetes)
 
 Examples:
-  ./edge-sync up --mode local
+  ./edge-sync up --mode local --open
   ./edge-sync status
   ./edge-sync doctor --mode edge
   ./edge-sync down --mode local --reset
@@ -158,13 +252,10 @@ EOF
 }
 
 case "$CMD" in
-  up)
-    if [ "$MODE" = local ]; then local_up; else k3s_delegate up; fi ;;
-  down)
-    if [ "$MODE" = local ]; then local_down; else k3s_delegate down; fi ;;
-  status)
-    if [ "$MODE" = local ]; then local_status; else k3s_delegate status; fi ;;
-  doctor)
-    if [ "$MODE" = local ]; then local_doctor; else k3s_delegate doctor; fi ;;
+  up)     [ "$MODE" = local ] && local_up     || k3s_delegate up ;;
+  down)   [ "$MODE" = local ] && local_down   || k3s_delegate down ;;
+  status) [ "$MODE" = local ] && local_status || k3s_delegate status ;;
+  doctor) [ "$MODE" = local ] && local_doctor || k3s_delegate doctor ;;
+  version) echo "0.1.0" ;;
   help|*) help_text ;;
 esac
