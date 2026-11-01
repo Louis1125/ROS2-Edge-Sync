@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <memory>
+#include <mutex>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -11,15 +13,17 @@
 #include "edge_sync_base/config.hpp"
 #include "edge_sync_base/logger.hpp"
 #include "edge_sync_connection/connection_manager.hpp"
+#include "edge_sync_connection/sync_peer_adapter.hpp"
 #include "edge_sync_connection/tcp_transport.hpp"
+#include "edge_sync_core/sync_engine.hpp"
 #include "edge_sync_storage/artifact_repository.hpp"
+#include "edge_sync_storage/artifact_store.hpp"
 #include "edge_sync_storage/object_store.hpp"
 #include "edge_sync_storage/sqlite_repository.hpp"
 
 using namespace edge_sync;
 
 namespace {
-
 std::atomic<bool> g_stop{false};
 void on_signal(int) { g_stop = true; }
 
@@ -49,7 +53,6 @@ std::vector<connection::Endpoint> parse_peers(const std::string& spec) {
     }
     return peers;
 }
-
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -68,6 +71,7 @@ int main(int argc, char** argv) {
 
     base::ConsoleLogger logger(parse_level(c.get_string("logging.level", "info")));
     const std::string robot_id = c.get_string("robot.id", "robot-0");
+    const std::string fleet_secret = c.get_string("fleet.secret", "");
 
     // --- storage ---
     const std::string storage_root = c.get_string("storage.root", "/var/lib/edge-sync");
@@ -84,32 +88,90 @@ int main(int argc, char** argv) {
         return 1;
     }
     storage::ArtifactRepository repository(sqlite, objects);
-    (void)repository;  // wired into the sync engine in M4
+    storage::ArtifactStore artifact_store(storage_root + "/artifacts", objects, sqlite);
+    if (auto r = artifact_store.initialize(); !r) {
+        logger.log(base::LogLevel::Error, "artifact store: " + r.error().message);
+        return 1;
+    }
 
-    // --- connection ---
+    // --- data plane (peer) connection + sync engine ---
     const std::string listen = c.get_string("connection.listen", "0.0.0.0");
     const std::uint16_t port = static_cast<std::uint16_t>(c.get_int("connection.port", 7443));
 
-    auto transport = std::make_unique<connection::TcpTransport>();
-    connection::ConnectionManager manager(std::move(transport), logger);
-    manager.set_local_identity(robot_id);
-
-    if (auto r = manager.start({listen, port}); !r) {
+    auto peer_transport = std::make_unique<connection::TcpTransport>();
+    connection::ConnectionManager peers(std::move(peer_transport), logger);
+    peers.set_local_identity(robot_id);
+    if (!fleet_secret.empty()) peers.set_shared_secret(fleet_secret);
+    if (auto r = peers.start({listen, port}); !r) {
         logger.log(base::LogLevel::Error, "listen failed: " + r.error().message);
         return 1;
     }
-    logger.log(base::LogLevel::Info,
-               "robot '" + robot_id + "' listening on " + listen + ":" + std::to_string(port));
+    connection::SyncPeerAdapter adapter(peers, repository, objects);
+    core::SyncEngine engine(adapter, repository, adapter, artifact_store);
 
     for (const auto& peer : parse_peers(c.get_string("connection.peers", ""))) {
-        if (auto r = manager.connect_peer(peer); !r) {
-            logger.log(base::LogLevel::Warn,
-                       "connect to " + peer.address + ":" + std::to_string(peer.port) +
-                           " failed: " + r.error().message);
-        }
+        peers.connect_peer(peer);
     }
 
-    logger.log(base::LogLevel::Info, "runtime ready; press Ctrl-C to stop");
+    // --- control plane (agent) connection ---
+    std::unique_ptr<connection::ConnectionManager> control_plane;
+    std::mutex executed_mu;
+    std::set<std::string> executed;
+    std::mutex workers_mu;
+    std::vector<std::jthread> workers;
+
+    const std::string cp_host = c.get_string("control_plane.host", "");
+    if (!cp_host.empty()) {
+        const std::uint16_t cp_port = static_cast<std::uint16_t>(c.get_int("control_plane.port", 7443));
+        control_plane = std::make_unique<connection::ConnectionManager>(
+            std::make_unique<connection::TcpTransport>(), logger);
+        control_plane->set_local_identity(robot_id);
+        if (!fleet_secret.empty()) control_plane->set_shared_secret(fleet_secret);
+        control_plane->set_application_message_handler(
+            [&](const connection::Peer& cp, const protocol::MessageEnvelope& env) {
+                if (!env.has_sync_command()) return;
+                const auto command_id = env.sync_command().command_id();
+                const auto source = env.sync_command().source_robot();
+                const auto artifact = env.sync_command().artifact_id();
+
+                // idempotency: acknowledge and skip already-executed commands
+                {
+                    std::lock_guard lk(executed_mu);
+                    if (executed.count(command_id)) return;
+                }
+
+                // acknowledge delivery
+                protocol::MessageEnvelope ack;
+                ack.set_protocol_version(protocol::kProtocolVersion);
+                ack.mutable_sync_status_report()->set_command_id(command_id);
+                ack.mutable_sync_status_report()->set_status("acknowledged");
+                control_plane->send(cp.identity.robot_id, ack);
+
+                // execute on a worker thread (do not block the I/O thread)
+                workers.emplace_back([&, command_id, source, artifact]() {
+                    auto outcome = engine.synchronize(source, artifact);
+                    protocol::MessageEnvelope report;
+                    report.set_protocol_version(protocol::kProtocolVersion);
+                    auto* st = report.mutable_sync_status_report();
+                    st->set_command_id(command_id);
+                    if (outcome.ok()) {
+                        st->set_status("succeeded");
+                    } else {
+                        st->set_status("failed");
+                        st->set_error(outcome.error().message);
+                    }
+                    control_plane->send(cp.identity.robot_id, report);
+                    std::lock_guard lk(executed_mu);
+                    executed.insert(command_id);
+                });
+            });
+        control_plane->start({"0.0.0.0", 0});
+        control_plane->connect_peer({cp_host, cp_port});
+        logger.log(base::LogLevel::Info,
+                   "agent " + robot_id + " connecting to control plane " + cp_host);
+    }
+
+    logger.log(base::LogLevel::Info, "robot '" + robot_id + "' ready; press Ctrl-C to stop");
     std::signal(SIGINT, on_signal);
     std::signal(SIGTERM, on_signal);
 
@@ -118,10 +180,12 @@ int main(int argc, char** argv) {
     }
 
     logger.log(base::LogLevel::Info, "shutting down");
-    manager.stop();
-    if (auto r = sqlite.close(); !r) {
-        logger.log(base::LogLevel::Error, "sqlite close: " + r.error().message);
+    for (auto& w : workers) {
+        if (w.joinable()) w.join();
     }
+    if (control_plane) control_plane->stop();
+    peers.stop();
+    sqlite.close();
     logger.log(base::LogLevel::Info, "bye");
     return 0;
 }

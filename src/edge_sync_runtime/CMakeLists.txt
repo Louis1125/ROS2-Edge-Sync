@@ -9,6 +9,7 @@ find_package(edge_sync_core REQUIRED)
 find_package(edge_sync_connection REQUIRED)
 find_package(edge_sync_connection_asio REQUIRED)
 find_package(edge_sync_storage REQUIRED)
+set(CMAKE_CXX_STANDARD 20)
 
 add_executable(edge_syncd src/main.cpp)
 target_compile_features(edge_syncd PRIVATE cxx_std_20)
