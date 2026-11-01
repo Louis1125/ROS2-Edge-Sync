@@ -89,4 +89,71 @@ edge_sync::base::Result<void> Database::upsert_robot(const RobotRecord& robot) {
     return execute(sql);
 }
 
+edge_sync::base::Result<SyncJob> Database::create_sync_job(const SyncJob& job) {
+    std::string sql =
+        "INSERT INTO sync_jobs(job_id, source_robot, target_robot, artifact_id, status, "
+        "transferred_bytes, total_bytes, error) VALUES ('" +
+        job.job_id + "', '" + job.source_robot + "', '" + job.target_robot + "', '" +
+        job.artifact_id + "', '" + job.status + "', 0, 0, '')";
+    if (auto r = execute(sql); !r) return r.error();
+    return get_sync_job(job.job_id);
+}
+
+edge_sync::base::Result<std::vector<SyncJob>> Database::list_sync_jobs() {
+    PGresult* res = PQexec(conn_, "SELECT job_id, source_robot, target_robot, artifact_id, "
+                                 "status, transferred_bytes, total_bytes, error FROM sync_jobs "
+                                 "ORDER BY job_id");
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        const auto err = std::string(PQerrorMessage(conn_));
+        PQclear(res);
+        return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure, "postgres: " + err};
+    }
+    std::vector<SyncJob> jobs;
+    for (int i = 0; i < PQntuples(res); ++i) {
+        SyncJob j;
+        j.job_id = PQgetvalue(res, i, 0);
+        j.source_robot = PQgetvalue(res, i, 1);
+        j.target_robot = PQgetvalue(res, i, 2);
+        j.artifact_id = PQgetvalue(res, i, 3);
+        j.status = PQgetvalue(res, i, 4);
+        j.transferred_bytes = std::stoull(PQgetvalue(res, i, 5));
+        j.total_bytes = std::stoull(PQgetvalue(res, i, 6));
+        j.error = PQgetvalue(res, i, 7);
+        jobs.push_back(std::move(j));
+    }
+    PQclear(res);
+    return jobs;
+}
+
+edge_sync::base::Result<SyncJob> Database::get_sync_job(const std::string& job_id) {
+    std::string sql = "SELECT job_id, source_robot, target_robot, artifact_id, status, "
+                      "transferred_bytes, total_bytes, error FROM sync_jobs WHERE job_id = '" +
+                      job_id + "'";
+    PGresult* res = PQexec(conn_, sql.c_str());
+    if (PQresultStatus(res) != PGRES_TUPLES_OK || PQntuples(res) == 0) {
+        PQclear(res);
+        return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
+                                      "job not found: " + job_id};
+    }
+    SyncJob j;
+    j.job_id = PQgetvalue(res, 0, 0);
+    j.source_robot = PQgetvalue(res, 0, 1);
+    j.target_robot = PQgetvalue(res, 0, 2);
+    j.artifact_id = PQgetvalue(res, 0, 3);
+    j.status = PQgetvalue(res, 0, 4);
+    j.transferred_bytes = std::stoull(PQgetvalue(res, 0, 5));
+    j.total_bytes = std::stoull(PQgetvalue(res, 0, 6));
+    j.error = PQgetvalue(res, 0, 7);
+    PQclear(res);
+    return j;
+}
+
+edge_sync::base::Result<void> Database::update_sync_job_status(const std::string& job_id,
+                                                               const std::string& status,
+                                                               const std::string& error) {
+    std::string sql = "UPDATE sync_jobs SET status = '" + status + "', error = '" + error +
+                      "' WHERE job_id = '" + job_id + "'";
+    return execute(sql);
+}
+
 }  // namespace edge_sync::control_plane

@@ -23,6 +23,13 @@ public:
     edge_sync::base::Result<std::vector<RobotRecord>> list_robots();
     edge_sync::base::Result<void> upsert_robot(const RobotRecord& robot);
 
+    edge_sync::base::Result<SyncJob> create_sync_job(const SyncJob& job);
+    edge_sync::base::Result<std::vector<SyncJob>> list_sync_jobs();
+    edge_sync::base::Result<SyncJob> get_sync_job(const std::string& job_id);
+    edge_sync::base::Result<void> update_sync_job_status(const std::string& job_id,
+                                                         const std::string& status,
+                                                         const std::string& error);
+
 private:
     edge_sync::base::Result<void> execute(const std::string& sql);
 

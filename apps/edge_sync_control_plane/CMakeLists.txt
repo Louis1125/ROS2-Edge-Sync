@@ -12,6 +12,7 @@ add_executable(edge_sync_control_plane
   src/main.cpp
   src/database.cpp
   src/robot_service.cpp
+  src/sync_job_service.cpp
 )
 target_include_directories(edge_sync_control_plane PRIVATE include)
 target_link_libraries(edge_sync_control_plane PRIVATE
