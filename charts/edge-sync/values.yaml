@@ -1,0 +1,48 @@
+# Deployment profile: demo | k3s | k8s | production
+profile: k3s
+
+replicaCount: 1
+
+image:
+  controlPlane:
+    repository: ghcr.io/ros2-edge-sync/control-plane
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: ghcr.io/ros2-edge-sync/web
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+
+postgres:
+  enabled: false          # set true to run an in-cluster PostgreSQL (demo)
+  host: postgres          # external host when enabled=false
+  port: 5432
+  database: edge_sync
+  user: edge_sync
+  password: change-me
+  storage: 5Gi
+
+fleetSecret: change-me   # shared secret for the authenticated robot handshake
+
+migrations:
+  image:
+    repository: ghcr.io/ros2-edge-sync/control-plane
+    tag: "0.1.0"
+
+ingress:
+  enabled: false
+  className: ""
+  host: edge-sync.local
+  tlsSecret: ""
+
+resources:
+  controlPlane:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: "1", memory: 512Mi }
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+
+networkPolicy:
+  enabled: true

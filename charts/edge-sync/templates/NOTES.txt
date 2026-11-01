@@ -1,0 +1,11 @@
+ROS2-Edge-Sync has been installed.
+
+Control plane API:   http://{{ include "edge-sync.fullname" . }}-control-plane:8080
+Web console:         http://{{ include "edge-sync.fullname" . }}-frontend:80
+{{- if .Values.ingress.enabled }}
+Ingress host:        https://{{ .Values.ingress.host }}
+{{- end }}
+
+Next steps:
+  1. Enroll robot agents with `edge-sync enroll`.
+  2. Register an artifact, create a deployment, and watch it synchronize.

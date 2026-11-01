@@ -1,0 +1,6 @@
+apiVersion: v2
+name: edge-sync
+description: ROS2-Edge-Sync fleet operations platform (control plane, agent gateway, web console)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

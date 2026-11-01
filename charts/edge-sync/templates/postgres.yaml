@@ -1,0 +1,59 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "edge-sync.fullname" . }}-postgres
+  labels:
+    {{- include "edge-sync.labels" . | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.postgres.storage }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "edge-sync.fullname" . }}-postgres
+  labels:
+    {{- include "edge-sync.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: {{ include "edge-sync.fullname" . }}-postgres }
+  template:
+    metadata:
+      labels: { app: {{ include "edge-sync.fullname" . }}-postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.database | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgres.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "edge-sync.fullname" . }}
+                  key: postgres-password
+          ports: [{ containerPort: 5432 }]
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "edge-sync.fullname" . }}-postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "edge-sync.fullname" . }}-postgres
+  labels:
+    {{- include "edge-sync.labels" . | nindent 4 }}
+spec:
+  selector: { app: {{ include "edge-sync.fullname" . }}-postgres }
+  ports: [{ port: 5432 }]
+{{- end }}
