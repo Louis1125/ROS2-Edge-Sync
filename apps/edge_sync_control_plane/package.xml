@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>edge_sync_control_plane</name>
+  <version>0.1.0</version>
+  <description>Management control plane: HTTP API, PostgreSQL persistence and agent gateway.</description>
+  <maintainer email="you@example.com">ROS2-Edge-Sync Contributors</maintainer>
+  <license>MIT</license>
+
+  <depend>edge_sync_base</depend>
+  <depend>edge_sync_core</depend>
+  <depend>edge_sync_connection</depend>
+  <depend>libpq-dev</depend>
+
+  <export>
+    <build_type>cmake</build_type>
+  </export>
+</package>

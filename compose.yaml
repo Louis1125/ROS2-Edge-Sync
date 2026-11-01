@@ -1,4 +1,46 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: edge_sync
+      POSTGRES_USER: edge_sync
+      POSTGRES_PASSWORD: edge_sync
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edge_sync"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - edge-network
+
+  control-plane:
+    build:
+      context: .
+      dockerfile: docker/control-plane.Dockerfile
+    environment:
+      DATABASE_URL: host=postgres port=5432 dbname=edge_sync user=edge_sync password=edge_sync
+      MIGRATIONS_DIR: /workspace/apps/edge_sync_control_plane/migrations
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - edge-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      - control-plane
+    networks:
+      - edge-network
+
   # Interactive development container.
   dev:
     build:
@@ -54,6 +96,7 @@ services:
       - edge-network
 
 volumes:
+  postgres-data:
   build-data:
   install-data:
   log-data:
