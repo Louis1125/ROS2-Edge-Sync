@@ -61,6 +61,10 @@ public:
 
     void send(const std::string& robot_id, const edge_sync::protocol::MessageEnvelope& envelope);
     void set_application_message_handler(ApplicationMessageHandler handler);
+
+    // Notified when a peer finishes the handshake (connected) or drops.
+    void set_peer_event_handler(std::function<void(const std::string&)> on_connected,
+                                std::function<void(const std::string&)> on_disconnected);
     void stop();
 
     [[nodiscard]] bool is_connected(const std::string& robot_id) const;
@@ -104,6 +108,8 @@ private:
     RetryPolicy retry_;
     TimeoutConfig timeouts_;
     ApplicationMessageHandler app_handler_;
+    std::function<void(const std::string&)> peer_connected_;
+    std::function<void(const std::string&)> peer_disconnected_;
 
     std::atomic<bool> stopping_{false};
     std::vector<std::jthread> reconnect_threads_;

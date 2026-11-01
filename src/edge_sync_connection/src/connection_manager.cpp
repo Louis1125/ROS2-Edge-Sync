@@ -199,6 +199,7 @@ void ConnectionManager::handle_handshake_request(ConnectionId id, const Endpoint
     send_envelope(id, resp);
     logger_.log(edge_sync::base::LogLevel::Info,
                 "handshake complete (inbound) with '" + req.robot_id() + "'");
+    if (peer_connected_) peer_connected_(req.robot_id());
 }
 
 void ConnectionManager::handle_handshake_response(ConnectionId id, const Endpoint&,
@@ -220,6 +221,7 @@ void ConnectionManager::handle_handshake_response(ConnectionId id, const Endpoin
     conn_by_robot_[resp.robot_id()] = id;
     logger_.log(edge_sync::base::LogLevel::Info,
                 "handshake complete (outbound) with '" + resp.robot_id() + "'");
+    if (peer_connected_) peer_connected_(resp.robot_id());
 }
 
 void ConnectionManager::on_disconnected(ConnectionId id) {
@@ -230,6 +232,7 @@ void ConnectionManager::on_disconnected(ConnectionId id) {
 
     if (!robot_id.empty()) conn_by_robot_.erase(robot_id);
     erase_connection(id);
+    if (peer_disconnected_ && !robot_id.empty()) peer_disconnected_(robot_id);
 
     logger_.log(edge_sync::base::LogLevel::Warn,
                 "connection lost" + (robot_id.empty() ? "" : " with '" + robot_id + "'"));
@@ -309,6 +312,13 @@ void ConnectionManager::send_envelope(ConnectionId id,
 
 void ConnectionManager::set_application_message_handler(ApplicationMessageHandler handler) {
     app_handler_ = std::move(handler);
+}
+
+void ConnectionManager::set_peer_event_handler(
+    std::function<void(const std::string&)> on_connected,
+    std::function<void(const std::string&)> on_disconnected) {
+    peer_connected_ = std::move(on_connected);
+    peer_disconnected_ = std::move(on_disconnected);
 }
 
 bool ConnectionManager::is_connected(const std::string& robot_id) const {
