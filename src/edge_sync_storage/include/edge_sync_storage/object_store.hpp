@@ -4,13 +4,14 @@
 
 #include "edge_sync_base/result.hpp"
 #include "edge_sync_base/types.hpp"
+#include "edge_sync_core/transfer.hpp"
 
 namespace edge_sync::storage {
 
 // Content-addressed object store on the local filesystem. Objects are written
 // once under <root>/<aa>/<full-hash> and are immutable, so identical content is
 // stored exactly once.
-class ObjectStore {
+class ObjectStore : public edge_sync::core::IChunkProvider {
 public:
     explicit ObjectStore(std::string root);
 
@@ -18,6 +19,9 @@ public:
     edge_sync::base::Result<edge_sync::base::Hash> put(const edge_sync::base::ByteBuffer& data);
     edge_sync::base::Result<edge_sync::base::ByteBuffer> get(const edge_sync::base::Hash& hash);
     edge_sync::base::Result<bool> exists(const edge_sync::base::Hash& hash);
+
+    edge_sync::base::Result<edge_sync::base::ByteBuffer> get_chunk(
+        const edge_sync::base::Hash& hash) override;
 
 private:
     [[nodiscard]] std::string path_for(const edge_sync::base::Hash& hash) const;

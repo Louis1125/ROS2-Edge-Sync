@@ -63,6 +63,11 @@ edge_sync::base::Result<bool> ObjectStore::exists(const edge_sync::base::Hash& h
     return fs::exists(path_for(hash), ec);
 }
 
+edge_sync::base::Result<edge_sync::base::ByteBuffer> ObjectStore::get_chunk(
+    const edge_sync::base::Hash& hash) {
+    return get(hash);
+}
+
 std::string ObjectStore::path_for(const edge_sync::base::Hash& hash) const {
     return root_ + "/" + hash.substr(0, 2) + "/" + hash;
 }

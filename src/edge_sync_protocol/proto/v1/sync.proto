@@ -40,11 +40,12 @@ message MessageEnvelope {
     oneof payload {
         HandshakeRequest handshake_request = 10;
         HandshakeResponse handshake_response = 11;
-        SyncRequest sync_request = 12;
         ManifestRequest manifest_request = 13;
-        ChunkRequest chunk_request = 14;
-        ChunkResponse chunk_response = 15;
-        SyncResult sync_result = 16;
         ManifestResponse manifest_response = 17;
+        TransferRequest transfer_request = 20;
+        TransferResponse transfer_response = 21;
+        ChunkRequest chunk_request = 22;
+        ChunkData chunk_data = 23;
+        ChunkAck chunk_ack = 24;
     }
 }

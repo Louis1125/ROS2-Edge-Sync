@@ -2,16 +2,35 @@ syntax = "proto3";
 
 package edge_sync.protocol.v1;
 
-import "v1/common.proto";
+// Bulk data transfer is driven by the receiver (authoritative for resume).
+// The sender streams ChunkData with a bounded sliding window; the receiver
+// acknowledges each chunk after committing it.
 
-message ChunkRequest {
-    string artifact_id = 1;
-    uint64 chunk_index = 2;
+message TransferRequest {
+    string transfer_id = 1;
+    string artifact_id = 2;
+    repeated uint64 chunk_indices = 3;   // chunks still needed (resume state)
 }
 
-message ChunkResponse {
-    string artifact_id = 1;
+message TransferResponse {
+    string transfer_id = 1;
+    bool accepted = 2;
+    string reason = 3;
+}
+
+message ChunkRequest {
+    string transfer_id = 1;
+    string artifact_id = 2;
+    uint64 chunk_index = 3;
+}
+
+message ChunkData {
+    string transfer_id = 1;
     uint64 chunk_index = 2;
-    Chunk chunk = 3;
-    Hash chunk_hash = 4;
+    bytes data = 3;
+}
+
+message ChunkAck {
+    string transfer_id = 1;
+    uint64 chunk_index = 2;
 }
