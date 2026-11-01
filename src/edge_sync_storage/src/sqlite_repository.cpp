@@ -24,6 +24,12 @@ CREATE TABLE IF NOT EXISTS manifest_chunks (
   chunk_size INTEGER NOT NULL,
   chunk_hash TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS active_versions (
+  artifact_id TEXT PRIMARY KEY,
+  version_major INTEGER NOT NULL,
+  version_minor INTEGER NOT NULL,
+  version_patch INTEGER NOT NULL
+);
 )SQL";
 
 edge_sync::base::Error sql_error(sqlite3* db, const char* context) {
@@ -166,6 +172,42 @@ edge_sync::base::Result<edge_sync::core::Manifest> SqliteRepository::load_manife
     }
     sqlite3_finalize(stmt);
     return manifest;
+}
+
+edge_sync::base::Result<void> SqliteRepository::store_active_version(
+    const edge_sync::base::ArtifactId& artifact_id, const edge_sync::base::Version& version) {
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql =
+        "INSERT OR REPLACE INTO active_versions(artifact_id, version_major, version_minor, "
+        "version_patch) VALUES(?,?,?,?)";
+    sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    sqlite3_bind_text(stmt, 1, artifact_id.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 2, static_cast<int>(version.major));
+    sqlite3_bind_int(stmt, 3, static_cast<int>(version.minor));
+    sqlite3_bind_int(stmt, 4, static_cast<int>(version.patch));
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    return {};
+}
+
+edge_sync::base::Result<std::optional<edge_sync::base::Version>>
+SqliteRepository::load_active_version(const edge_sync::base::ArtifactId& artifact_id) {
+    sqlite3_stmt* stmt = nullptr;
+    const char* sql =
+        "SELECT version_major, version_minor, version_patch FROM active_versions "
+        "WHERE artifact_id = ?";
+    sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
+    sqlite3_bind_text(stmt, 1, artifact_id.c_str(), -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(stmt) != SQLITE_ROW) {
+        sqlite3_finalize(stmt);
+        return std::optional<edge_sync::base::Version>{};
+    }
+    edge_sync::base::Version v;
+    v.major = static_cast<std::uint32_t>(sqlite3_column_int(stmt, 0));
+    v.minor = static_cast<std::uint32_t>(sqlite3_column_int(stmt, 1));
+    v.patch = static_cast<std::uint32_t>(sqlite3_column_int(stmt, 2));
+    sqlite3_finalize(stmt);
+    return std::optional<edge_sync::base::Version>{v};
 }
 
 edge_sync::base::Result<bool> SqliteRepository::manifest_exists(

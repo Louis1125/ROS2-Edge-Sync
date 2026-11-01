@@ -70,12 +70,19 @@ if(BUILD_TESTING)
     GTest::gtest GTest::gtest_main)
   target_include_directories(test_transfer PRIVATE ${TEST_SUPPORT})
 
+  add_executable(test_sync_engine test/test_sync_engine.cpp)
+  target_link_libraries(test_sync_engine PRIVATE
+    edge_sync_connection edge_sync_connection_asio edge_sync::storage edge_sync::core
+    GTest::gtest GTest::gtest_main)
+  target_include_directories(test_sync_engine PRIVATE ${TEST_SUPPORT})
+
   include(GoogleTest)
   gtest_discover_tests(test_frame_codec)
   gtest_discover_tests(test_handshake)
   gtest_discover_tests(test_reconnect)
   gtest_discover_tests(test_sync)
   gtest_discover_tests(test_transfer)
+  gtest_discover_tests(test_sync_engine)
 endif()
 
 install(TARGETS edge_sync_connection EXPORT edge_sync_connectionTargets
