@@ -37,8 +37,10 @@ Json::Value job_json(const SyncJob& j) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    (void)argc;
-    (void)argv;
+    bool migrate_only = false;
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--migrate-only") migrate_only = true;
+    }
     const std::string db_url = std::getenv("DATABASE_URL")
                                    ? std::getenv("DATABASE_URL")
                                    : "host=localhost port=5432 dbname=edge_sync user=edge_sync "
@@ -54,6 +56,10 @@ int main(int argc, char** argv) {
     if (auto r = db.migrate(mig); !r) {
         LOG_ERROR << "migrations failed: " << r.error().message;
         return 1;
+    }
+    if (migrate_only) {
+        LOG_INFO << "migrations applied; exiting";
+        return 0;
     }
 
     auto robot_service = std::make_shared<RobotService>(db);

@@ -22,3 +22,7 @@ CTestTestfile.cmake
 
 # Logs
 *.log
+
+# Web
+web/node_modules/
+web/dist/
