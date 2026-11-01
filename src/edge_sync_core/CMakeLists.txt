@@ -6,7 +6,10 @@ include(CMakePackageConfigHelpers)
 
 find_package(edge_sync_base REQUIRED)
 
-add_library(edge_sync_core src/version.cpp)
+add_library(edge_sync_core
+  src/version.cpp
+  src/sync_coordinator.cpp
+)
 add_library(edge_sync::core ALIAS edge_sync_core)
 set_target_properties(edge_sync_core PROPERTIES EXPORT_NAME core)
 target_compile_features(edge_sync_core PUBLIC cxx_std_20)
