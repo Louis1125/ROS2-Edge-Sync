@@ -70,7 +70,7 @@ TEST(SyncTest, CoordinatorPlansChunkDiffAgainstRemoteManifest) {
     auto b_conn = std::make_unique<ConnectionManager>(std::make_unique<TcpTransport>(), log);
     b_conn->set_local_identity("robot-b");
     ASSERT_TRUE(b_conn->start(kRobotB).ok());
-    SyncPeerAdapter b_adapter(*b_conn, b_repo);
+    SyncPeerAdapter b_adapter(*b_conn, b_repo, *b_objects);
 
     // robot-a starts empty and connects to robot-b.
     const std::string a_root = tmp_dir("sync_a");
@@ -83,7 +83,7 @@ TEST(SyncTest, CoordinatorPlansChunkDiffAgainstRemoteManifest) {
     auto a_conn = std::make_unique<ConnectionManager>(std::make_unique<TcpTransport>(), log);
     a_conn->set_local_identity("robot-a");
     ASSERT_TRUE(a_conn->start(kRobotA).ok());
-    SyncPeerAdapter a_adapter(*a_conn, a_repo);
+    SyncPeerAdapter a_adapter(*a_conn, a_repo, *a_objects);
     ASSERT_TRUE(a_conn->connect_peer(kRobotB).ok());
     wait_for([&] { return a_conn->is_connected("robot-b"); });
 

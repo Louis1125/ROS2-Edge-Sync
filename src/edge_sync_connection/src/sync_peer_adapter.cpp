@@ -1,5 +1,7 @@
 #include "edge_sync_connection/sync_peer_adapter.hpp"
 
+#include <algorithm>
+#include <set>
 #include <string>
 
 namespace edge_sync::connection {
@@ -73,12 +75,25 @@ void to_proto(const edge_sync::core::Manifest& in,
 }  // namespace
 
 SyncPeerAdapter::SyncPeerAdapter(ConnectionManager& connections,
-                                 edge_sync::core::IArtifactRepository& local_repository)
-    : connections_(connections), local_repository_(local_repository) {
+                                 edge_sync::core::IArtifactRepository& local_repository,
+                                 edge_sync::core::IChunkProvider& chunks)
+    : connections_(connections), local_repository_(local_repository), chunks_(chunks) {
     connections_.set_application_message_handler(
         [this](const Peer& peer, const edge_sync::protocol::MessageEnvelope& env) {
             on_application_message(peer, env);
         });
+    worker_ = std::jthread([this](std::stop_token stop) { worker_loop(stop); });
+}
+
+SyncPeerAdapter::~SyncPeerAdapter() { stop(); }
+
+void SyncPeerAdapter::stop() {
+    if (stopped_.exchange(true)) return;
+    if (worker_.joinable()) {
+        worker_.request_stop();
+        queue_cv_.notify_all();
+        worker_.join();
+    }
 }
 
 edge_sync::base::Result<edge_sync::core::Manifest> SyncPeerAdapter::request_manifest(
@@ -104,24 +119,233 @@ edge_sync::base::Result<edge_sync::core::Manifest> SyncPeerAdapter::request_mani
     return to_core(mr.manifest());
 }
 
+edge_sync::base::Result<void> SyncPeerAdapter::pull_chunks(
+    const edge_sync::base::RobotId& source, const edge_sync::base::ArtifactId& artifact_id,
+    const std::vector<std::uint64_t>& chunk_indices, edge_sync::core::IChunkReceiver& receiver) {
+    if (chunk_indices.empty()) return {};
+
+    const std::string transfer_id = source + "-" + std::to_string(transfer_seq_++);
+    auto ctx = std::make_shared<PullContext>();
+    {
+        std::lock_guard lk(pulls_mu_);
+        pulls_[transfer_id] = ctx;
+    }
+    auto unregister = [&] {
+        std::lock_guard lk(pulls_mu_);
+        pulls_.erase(transfer_id);
+    };
+
+    // Open the transfer session (control plane of the transfer).
+    {
+        edge_sync::protocol::MessageEnvelope env;
+        env.set_protocol_version(edge_sync::protocol::kProtocolVersion);
+        auto* req = env.mutable_transfer_request();
+        req->set_transfer_id(transfer_id);
+        req->set_artifact_id(artifact_id);
+        for (const auto idx : chunk_indices) req->add_chunk_indices(idx);
+
+        auto resp =
+            connections_.request(source, std::move(env), std::chrono::milliseconds(5000));
+        if (!resp) {
+            unregister();
+            return resp.error();
+        }
+        if (!resp.value().has_transfer_response() || !resp.value().transfer_response().accepted()) {
+            unregister();
+            return edge_sync::base::Error{edge_sync::base::ErrorCode::ConnectionFailed,
+                                          resp.value().has_transfer_response()
+                                              ? resp.value().transfer_response().reason()
+                                              : "transfer rejected"};
+        }
+    }
+
+    constexpr std::size_t kWindow = 4;
+    std::set<std::uint64_t> outstanding(chunk_indices.begin(), chunk_indices.end());
+    std::vector<std::uint64_t> inflight;
+    std::size_t next = 0;
+
+    auto request_next = [&] {
+        while (inflight.size() < kWindow && next < chunk_indices.size()) {
+            const auto idx = chunk_indices[next++];
+            send_chunk_request(source, transfer_id, artifact_id, idx);
+            inflight.push_back(idx);
+        }
+    };
+    request_next();
+
+    int timeouts = 0;
+    constexpr int kMaxTimeouts = 5;
+    while (!outstanding.empty()) {
+        std::unique_lock lk(ctx->mu);
+        if (ctx->failed) break;
+        if (ctx->data.empty()) {
+            const bool got = ctx->cv.wait_for(lk, std::chrono::seconds(3),
+                                              [&] { return !ctx->data.empty() || ctx->failed; });
+            if (!got) {
+                // Re-request every outstanding chunk (receiver-authoritative resume).
+                if (++timeouts > kMaxTimeouts) {
+                    unregister();
+                    return edge_sync::base::Error{edge_sync::base::ErrorCode::Timeout,
+                                                  "transfer timed out"};
+                }
+                lk.unlock();
+                for (const auto idx : outstanding) {
+                    send_chunk_request(source, transfer_id, artifact_id, idx);
+                }
+                continue;
+            }
+        }
+
+        auto it = ctx->data.begin();
+        const std::uint64_t idx = it->first;
+        ByteBuffer data = std::move(it->second);
+        ctx->data.erase(it);
+        lk.unlock();
+
+        auto r = receiver.on_chunk(idx, std::move(data));
+        if (!r.ok()) {
+            std::lock_guard lk2(ctx->mu);
+            ctx->failed = true;
+            ctx->error = r.error().message;
+            ctx->cv.notify_all();
+            break;
+        }
+
+        send_chunk_ack(source, transfer_id, idx);
+
+        lk.lock();
+        outstanding.erase(idx);
+        inflight.erase(std::remove(inflight.begin(), inflight.end(), idx), inflight.end());
+        lk.unlock();
+
+        request_next();
+    }
+
+    unregister();
+    if (ctx->failed) {
+        return edge_sync::base::Error{edge_sync::base::ErrorCode::Internal, ctx->error};
+    }
+    return {};
+}
+
 void SyncPeerAdapter::on_application_message(
     const Peer& peer, const edge_sync::protocol::MessageEnvelope& env) {
-    if (!env.has_manifest_request()) return;
-
-    const auto& req = env.manifest_request();
-    const auto local = local_repository_.load(req.artifact_id());
-
-    edge_sync::protocol::MessageEnvelope response;
-    response.set_protocol_version(edge_sync::protocol::kProtocolVersion);
-    response.set_request_id(env.request_id());
-    auto* mr = response.mutable_manifest_response();
-    if (local.ok()) {
-        mr->set_found(true);
-        to_proto(local.value(), mr->mutable_manifest());
-    } else {
-        mr->set_found(false);
+    if (env.has_manifest_request()) {
+        const auto& req = env.manifest_request();
+        const auto local = local_repository_.load(req.artifact_id());
+        edge_sync::protocol::MessageEnvelope response;
+        response.set_protocol_version(edge_sync::protocol::kProtocolVersion);
+        response.set_request_id(env.request_id());
+        auto* mr = response.mutable_manifest_response();
+        if (local.ok()) {
+            mr->set_found(true);
+            to_proto(local.value(), mr->mutable_manifest());
+        } else {
+            mr->set_found(false);
+        }
+        connections_.send(peer.identity.robot_id, response);
+        return;
     }
-    connections_.send(peer.identity.robot_id, response);
+
+    if (env.has_transfer_request()) {
+        const auto& req = env.transfer_request();
+        const auto exists = local_repository_.exists(req.artifact_id());
+        const bool have = exists.ok() && exists.value();
+        edge_sync::protocol::MessageEnvelope response;
+        response.set_protocol_version(edge_sync::protocol::kProtocolVersion);
+        response.set_request_id(env.request_id());
+        auto* tr = response.mutable_transfer_response();
+        tr->set_transfer_id(req.transfer_id());
+        tr->set_accepted(have);
+        if (!have) tr->set_reason("artifact not found");
+        connections_.send(peer.identity.robot_id, response);
+        return;
+    }
+
+    if (env.has_chunk_request()) {
+        const auto& req = env.chunk_request();
+        ServeTask task{peer.identity.robot_id, req.transfer_id(), req.artifact_id(),
+                       req.chunk_index()};
+        {
+            std::lock_guard lk(queue_mu_);
+            queue_.push(std::move(task));
+        }
+        queue_cv_.notify_all();
+        return;
+    }
+
+    if (env.has_chunk_data()) {
+        const auto& cd = env.chunk_data();
+        std::lock_guard lk(pulls_mu_);
+        const auto it = pulls_.find(cd.transfer_id());
+        if (it == pulls_.end()) return;  // late data for a finished transfer
+        auto& ctx = it->second;
+        std::lock_guard clk(ctx->mu);
+        ctx->data[cd.chunk_index()] = ByteBuffer(cd.data().begin(), cd.data().end());
+        ctx->cv.notify_all();
+        return;
+    }
+
+    // chunk_ack is informational; the receiver is authoritative for resume.
+}
+
+void SyncPeerAdapter::send_chunk_request(const std::string& robot, const std::string& transfer_id,
+                                         const std::string& artifact_id, std::uint64_t chunk_index) {
+    edge_sync::protocol::MessageEnvelope env;
+    env.set_protocol_version(edge_sync::protocol::kProtocolVersion);
+    auto* req = env.mutable_chunk_request();
+    req->set_transfer_id(transfer_id);
+    req->set_artifact_id(artifact_id);
+    req->set_chunk_index(chunk_index);
+    connections_.send(robot, env);
+}
+
+void SyncPeerAdapter::send_chunk_ack(const std::string& robot, const std::string& transfer_id,
+                                     std::uint64_t chunk_index) {
+    edge_sync::protocol::MessageEnvelope env;
+    env.set_protocol_version(edge_sync::protocol::kProtocolVersion);
+    auto* ack = env.mutable_chunk_ack();
+    ack->set_transfer_id(transfer_id);
+    ack->set_chunk_index(chunk_index);
+    connections_.send(robot, env);
+}
+
+void SyncPeerAdapter::worker_loop(std::stop_token stop) {
+    while (!stop.stop_requested()) {
+        ServeTask task;
+        {
+            std::unique_lock lk(queue_mu_);
+            queue_cv_.wait(lk, stop, [&] { return !queue_.empty(); });
+            if (stop.stop_requested()) return;
+            task = std::move(queue_.front());
+            queue_.pop();
+        }
+
+        auto manifest = local_repository_.load(task.artifact_id);
+        if (!manifest.ok()) continue;
+
+        edge_sync::base::Hash hash;
+        bool found = false;
+        for (const auto& c : manifest.value().chunks) {
+            if (c.index == task.chunk_index) {
+                hash = c.hash;
+                found = true;
+                break;
+            }
+        }
+        if (!found) continue;
+
+        auto data = chunks_.get_chunk(hash);
+        if (!data.ok()) continue;
+
+        edge_sync::protocol::MessageEnvelope env;
+        env.set_protocol_version(edge_sync::protocol::kProtocolVersion);
+        auto* cd = env.mutable_chunk_data();
+        cd->set_transfer_id(task.transfer_id);
+        cd->set_chunk_index(task.chunk_index);
+        cd->set_data(std::string(data.value().begin(), data.value().end()));
+        connections_.send(task.target_robot, env);
+    }
 }
 
 }  // namespace edge_sync::connection
