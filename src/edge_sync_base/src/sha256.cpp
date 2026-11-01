@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstring>
+#include <fstream>
 #include <vector>
 
 namespace edge_sync::base {
@@ -19,7 +20,22 @@ constexpr std::array<std::uint32_t, 64> kRound = {
 
 std::uint32_t rotr(std::uint32_t x, std::uint32_t n) { return (x >> n) | (x << (32 - n)); }
 
-void transform(std::uint32_t h[8], const std::uint8_t* block) {
+std::string hex(const std::uint8_t* data, std::size_t n) {
+    static const char* digits = "0123456789abcdef";
+    std::string out(n * 2, '0');
+    for (std::size_t i = 0; i < n; ++i) {
+        out[i * 2] = digits[data[i] >> 4];
+        out[i * 2 + 1] = digits[data[i] & 0xf];
+    }
+    return out;
+}
+
+}  // namespace
+
+Sha256::Sha256() : h_{0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+                       0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19} {}
+
+void Sha256::transform_block(const std::uint8_t* block) {
     std::uint32_t w[64];
     for (int i = 0; i < 16; ++i) {
         w[i] = (static_cast<std::uint32_t>(block[i * 4]) << 24) |
@@ -33,9 +49,8 @@ void transform(std::uint32_t h[8], const std::uint8_t* block) {
         w[i] = w[i - 16] + s0 + w[i - 7] + s1;
     }
 
-    std::uint32_t a = h[0], b = h[1], c = h[2], d = h[3];
-    std::uint32_t e = h[4], f = h[5], g = h[6], hh = h[7];
-
+    std::uint32_t a = h_[0], b = h_[1], c = h_[2], d = h_[3];
+    std::uint32_t e = h_[4], f = h_[5], g = h_[6], hh = h_[7];
     for (int i = 0; i < 64; ++i) {
         const std::uint32_t s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
         const std::uint32_t ch = (e & f) ^ ((~e) & g);
@@ -45,57 +60,83 @@ void transform(std::uint32_t h[8], const std::uint8_t* block) {
         const std::uint32_t t2 = s0 + maj;
         hh = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
     }
-
-    h[0] += a; h[1] += b; h[2] += c; h[3] += d;
-    h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+    h_[0] += a; h_[1] += b; h_[2] += c; h_[3] += d;
+    h_[4] += e; h_[5] += f; h_[6] += g; h_[7] += hh;
 }
 
-std::string hex(const std::uint8_t* data, std::size_t n) {
-    static const char* digits = "0123456789abcdef";
-    std::string out(n * 2, '0');
-    for (std::size_t i = 0; i < n; ++i) {
-        out[i * 2] = digits[data[i] >> 4];
-        out[i * 2 + 1] = digits[data[i] & 0xf];
+void Sha256::update(const std::uint8_t* data, std::size_t size) {
+    total_len_ += size;
+    const std::uint8_t* p = data;
+    std::size_t remaining = size;
+
+    if (buffer_len_ > 0) {
+        const std::size_t to_fill = 64 - buffer_len_;
+        const std::size_t take = std::min(to_fill, remaining);
+        std::memcpy(buffer_ + buffer_len_, p, take);
+        buffer_len_ += take;
+        p += take;
+        remaining -= take;
+        if (buffer_len_ == 64) {
+            transform_block(buffer_);
+            buffer_len_ = 0;
+        }
     }
-    return out;
+    while (remaining >= 64) {
+        transform_block(p);
+        p += 64;
+        remaining -= 64;
+    }
+    if (remaining > 0) {
+        std::memcpy(buffer_, p, remaining);
+        buffer_len_ = remaining;
+    }
 }
 
-}  // namespace
-
-edge_sync::base::Hash sha256_hex(const std::uint8_t* data, std::size_t size) {
-    std::uint32_t h[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-                          0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
-
-    const std::uint64_t bit_len = static_cast<std::uint64_t>(size) * 8;
-    const std::size_t padded_len = ((size + 9 + 63) / 64) * 64;
-
-    std::vector<std::uint8_t> msg(padded_len, 0);
-    if (size > 0) std::memcpy(msg.data(), data, size);
-    msg[size] = 0x80;
+Hash Sha256::final_hex() {
+    const std::uint64_t bit_len = total_len_ * 8;
+    std::uint8_t tail[128] = {0};
+    std::memcpy(tail, buffer_, buffer_len_);
+    tail[buffer_len_] = 0x80;
+    const std::size_t padded = ((buffer_len_ + 8) / 64 + 1) * 64;
     for (int i = 0; i < 8; ++i) {
-        msg[padded_len - 1 - i] = static_cast<std::uint8_t>((bit_len >> (8 * i)) & 0xff);
+        tail[padded - 1 - i] = static_cast<std::uint8_t>((bit_len >> (8 * i)) & 0xff);
     }
-
-    for (std::size_t off = 0; off < padded_len; off += 64) {
-        transform(h, msg.data() + off);
+    for (std::size_t off = 0; off < padded; off += 64) {
+        transform_block(tail + off);
     }
 
     std::uint8_t digest[32];
     for (int i = 0; i < 8; ++i) {
-        digest[i * 4] = static_cast<std::uint8_t>((h[i] >> 24) & 0xff);
-        digest[i * 4 + 1] = static_cast<std::uint8_t>((h[i] >> 16) & 0xff);
-        digest[i * 4 + 2] = static_cast<std::uint8_t>((h[i] >> 8) & 0xff);
-        digest[i * 4 + 3] = static_cast<std::uint8_t>(h[i] & 0xff);
+        digest[i * 4] = static_cast<std::uint8_t>((h_[i] >> 24) & 0xff);
+        digest[i * 4 + 1] = static_cast<std::uint8_t>((h_[i] >> 16) & 0xff);
+        digest[i * 4 + 2] = static_cast<std::uint8_t>((h_[i] >> 8) & 0xff);
+        digest[i * 4 + 3] = static_cast<std::uint8_t>(h_[i] & 0xff);
     }
     return hex(digest, 32);
 }
 
-edge_sync::base::Hash sha256_hex(const edge_sync::base::ByteBuffer& data) {
-    return sha256_hex(data.data(), data.size());
+Hash sha256_hex(const std::uint8_t* data, std::size_t size) {
+    Sha256 h;
+    h.update(data, size);
+    return h.final_hex();
 }
 
-edge_sync::base::Hash sha256_hex(const std::string& data) {
+Hash sha256_hex(const ByteBuffer& data) { return sha256_hex(data.data(), data.size()); }
+
+Hash sha256_hex(const std::string& data) {
     return sha256_hex(reinterpret_cast<const std::uint8_t*>(data.data()), data.size());
+}
+
+Hash sha256_hex_file(const std::string& path) {
+    std::ifstream in(path, std::ios::binary);
+    Sha256 h;
+    std::array<std::uint8_t, 1 << 20> buf{};
+    while (in) {
+        in.read(reinterpret_cast<char*>(buf.data()), buf.size());
+        const auto n = in.gcount();
+        if (n > 0) h.update(buf.data(), static_cast<std::size_t>(n));
+    }
+    return h.final_hex();
 }
 
 }  // namespace edge_sync::base
