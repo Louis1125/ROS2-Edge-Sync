@@ -11,6 +11,7 @@ add_library(edge_sync_core
   src/sync_coordinator.cpp
   src/manifest_builder.cpp
   src/sync_planner.cpp
+  src/sync_engine.cpp
 )
 add_library(edge_sync::core ALIAS edge_sync_core)
 set_target_properties(edge_sync_core PROPERTIES EXPORT_NAME core)
