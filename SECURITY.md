@@ -1,27 +1,27 @@
 # Security Policy
 
-## Reporting a vulnerability
+## Reporting
 
-Please report security issues privately rather than opening a public issue.
-Open a private security advisory via GitHub, or contact the maintainers
-directly. We will acknowledge within 72 hours and aim to triage within one week.
+Report vulnerabilities privately (GitHub private advisory or direct to
+maintainers), never as a public issue. We aim to acknowledge within 72 hours.
 
-## Security model
+## Implemented
 
-ROS2-Edge-Sync transfers configuration, maps and software artifacts between
-robots. The security model separates two concerns:
+- **Authenticated robot handshake** — robots present `HMAC-SHA256(shared_secret,
+  robot_id)` during the handshake; the server rejects peers that fail to
+  verify. Configure the fleet secret via `set_shared_secret` / config.
+- **Integrity** — per-chunk and full-artifact SHA-256 verification before
+  atomic activation; corrupted or incomplete artifacts never become active.
 
-1. **Robot middleware communication** — ROS 2 DDS (local nodes, lifecycle).
-2. **Distributed artifact transfer** — the Edge-Sync Connection Foundation,
-   which is the only path for cross-robot data movement and is expected to use
-   TLS + authentication (M6).
+## Not yet implemented (known gaps)
 
-Do not ship large artifacts through ROS 2 topics; use the connection layer.
+- **TLS on the wire** — the Asio transport is plaintext. Deploy behind a VPN /
+  mTLS tunnel until transport encryption lands.
+- **Per-robot enrollment secrets** — currently a single shared fleet secret;
+  expiring single-use enrollment credentials are planned.
+- **Control-plane API authentication** — the HTTP API has no auth yet; do not
+  expose it publicly.
+- **Replay protection** — the handshake token is static; a challenge-response
+  or certificate-based scheme is the hardening path.
 
-## Current status
-
-As of M0 the repository contains scaffolding only. TLS, authentication and
-authorization are designed for M6 and are **not yet implemented**. Do not deploy
-the current code to production or to untrusted networks.
-
-See [docs/SECURITY.md](docs/SECURITY.md) for the threat model.
+Do not deploy to untrusted networks or production until these are resolved.
