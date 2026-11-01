@@ -40,6 +40,7 @@ void AgentGateway::stop() {
 
 void AgentGateway::on_peer_connected(const std::string& robot_id) {
     db_.upsert_agent_session(robot_id);
+    db_.touch_robot(robot_id);
     logger_.log(edge_sync::base::LogLevel::Info, "agent connected: " + robot_id);
 }
 
@@ -47,8 +48,12 @@ void AgentGateway::on_peer_disconnected(const std::string& robot_id) {
     logger_.log(edge_sync::base::LogLevel::Warn, "agent disconnected: " + robot_id);
 }
 
-void AgentGateway::on_message(const edge_sync::connection::Peer&,
+void AgentGateway::on_message(const edge_sync::connection::Peer& peer,
                               const edge_sync::protocol::MessageEnvelope& env) {
+    if (env.has_heartbeat()) {
+        db_.touch_robot(peer.identity.robot_id);
+        return;
+    }
     if (!env.has_sync_status_report()) return;
     const auto& report = env.sync_status_report();
     const auto status = report.status();

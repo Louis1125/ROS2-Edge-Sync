@@ -111,11 +111,16 @@ int main(int argc, char** argv) {
                                      error_json(robots.error().message)));
                                  return;
                              }
+                             const auto now_ms =
+                                 std::chrono::duration_cast<std::chrono::milliseconds>(
+                                     std::chrono::system_clock::now().time_since_epoch())
+                                     .count();
                              for (const auto& r : robots.value()) {
                                  Json::Value j;
                                  j["robotId"] = r.robot_id;
                                  j["name"] = r.name;
-                                 j["status"] = r.status;
+                                 const bool online = (now_ms - r.last_seen_ms) < 15000;
+                                 j["status"] = online ? "online" : "offline";
                                  j["runtimeVersion"] = r.runtime_version;
                                  j["lastSeenMs"] = r.last_seen_ms;
                                  arr.append(j);

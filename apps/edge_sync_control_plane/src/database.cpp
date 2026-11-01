@@ -269,4 +269,22 @@ edge_sync::base::Result<void> Database::upsert_agent_session(const std::string& 
     return {};
 }
 
+edge_sync::base::Result<void> Database::touch_robot(const std::string& robot_id) {
+    const char* sql =
+        "INSERT INTO robots(robot_id, name, status, runtime_version, last_seen_ms) "
+        "VALUES($1, '', 'online', '', $2) "
+        "ON CONFLICT(robot_id) DO UPDATE SET last_seen_ms=$2, status='online'";
+    const auto now = std::to_string(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count());
+    const char* vals[2] = {robot_id.c_str(), now.c_str()};
+    PGresult* res = PQexecParams(conn_, sql, 2, nullptr, vals, nullptr, nullptr, 0);
+    const bool ok = PQresultStatus(res) == PGRES_COMMAND_OK;
+    const auto err = std::string(PQerrorMessage(conn_));
+    PQclear(res);
+    if (!ok) return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
+                                           "postgres: " + err};
+    return {};
+}
+
 }  // namespace edge_sync::control_plane

@@ -50,6 +50,7 @@ public:
                                                        const std::string& status,
                                                        const std::string& error);
     edge_sync::base::Result<void> upsert_agent_session(const std::string& robot_id);
+    edge_sync::base::Result<void> touch_robot(const std::string& robot_id);
 
 private:
     edge_sync::base::Result<void> execute(const std::string& sql);

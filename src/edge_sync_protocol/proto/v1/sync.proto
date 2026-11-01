@@ -48,6 +48,12 @@ message SyncStatusReport {
     string error = 3;
 }
 
+// Periodic liveness signal from a robot agent. The gateway refreshes last-seen
+// on receipt; online/offline is derived from last-seen freshness.
+message Heartbeat {
+    uint64 timestamp_ms = 1;
+}
+
 // Every remote message is wrapped in an envelope carrying identity and version.
 message MessageEnvelope {
     string robot_id = 1;
@@ -66,5 +72,6 @@ message MessageEnvelope {
         ChunkAck chunk_ack = 24;
         SyncCommand sync_command = 25;
         SyncStatusReport sync_status_report = 26;
+        Heartbeat heartbeat = 27;
     }
 }

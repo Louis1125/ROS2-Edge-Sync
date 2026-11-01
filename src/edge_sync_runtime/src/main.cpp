@@ -159,6 +159,7 @@ int main(int argc, char** argv) {
     std::vector<std::jthread> workers;
 
     const std::string cp_host = c.get_string("control_plane.host", "");
+    std::jthread heartbeat_thread;
     if (!cp_host.empty()) {
         const std::uint16_t cp_port = static_cast<std::uint16_t>(c.get_int("control_plane.port", 7443));
         control_plane = std::make_unique<connection::ConnectionManager>(
@@ -207,6 +208,22 @@ int main(int argc, char** argv) {
         control_plane->connect_peer({cp_host, cp_port});
         logger.log(base::LogLevel::Info,
                    "agent " + robot_id + " connecting to control plane " + cp_host);
+
+        heartbeat_thread = std::jthread([&](std::stop_token stop) {
+            while (!stop.stop_requested() && !g_stop) {
+                std::this_thread::sleep_for(std::chrono::seconds(5));
+                if (control_plane && control_plane->is_connected("control-plane")) {
+                    edge_sync::protocol::MessageEnvelope hb;
+                    hb.set_protocol_version(edge_sync::protocol::kProtocolVersion);
+                    const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                         std::chrono::system_clock::now().time_since_epoch())
+                                         .count();
+                    hb.mutable_heartbeat()->set_timestamp_ms(
+                        static_cast<std::uint64_t>(now));
+                    control_plane->send("control-plane", hb);
+                }
+            }
+        });
     }
 
     logger.log(base::LogLevel::Info, "robot '" + robot_id + "' ready; press Ctrl-C to stop");
@@ -220,6 +237,10 @@ int main(int argc, char** argv) {
     logger.log(base::LogLevel::Info, "shutting down");
     for (auto& w : workers) {
         if (w.joinable()) w.join();
+    }
+    if (heartbeat_thread.joinable()) {
+        heartbeat_thread.request_stop();
+        heartbeat_thread.join();
     }
     if (control_plane) control_plane->stop();
     peers.stop();
