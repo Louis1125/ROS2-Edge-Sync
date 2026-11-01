@@ -63,6 +63,36 @@ edge_sync::base::Result<void> ConnectionManager::connect_peer(const Endpoint& en
     return {};
 }
 
+edge_sync::base::Result<edge_sync::protocol::MessageEnvelope> ConnectionManager::request(
+    const std::string& robot_id, edge_sync::protocol::MessageEnvelope envelope,
+    std::chrono::milliseconds timeout) {
+    const auto conn = connection_for(robot_id);
+    if (!conn) {
+        return edge_sync::base::Error{edge_sync::base::ErrorCode::ConnectionFailed,
+                                      "not connected to '" + robot_id + "'"};
+    }
+
+    const std::string request_id = std::to_string(next_request_id_++);
+    envelope.set_request_id(request_id);
+
+    auto promise = std::make_shared<std::promise<edge_sync::protocol::MessageEnvelope>>();
+    auto future = promise->get_future();
+    {
+        std::lock_guard lk(pending_mu_);
+        pending_[request_id] = std::move(promise);
+    }
+
+    send_envelope(*conn, envelope);
+
+    if (future.wait_for(timeout) != std::future_status::ready) {
+        std::lock_guard lk(pending_mu_);
+        pending_.erase(request_id);
+        return edge_sync::base::Error{edge_sync::base::ErrorCode::Timeout,
+                                      "request timed out"};
+    }
+    return future.get();
+}
+
 void ConnectionManager::on_accepted(ConnectionId id, const Endpoint& endpoint) {
     endpoints_[id] = endpoint;
     outbound_[id] = false;
@@ -79,6 +109,17 @@ void ConnectionManager::on_message(ConnectionId id, ByteBuffer data) {
         return;
     }
     const auto& env = parsed.value();
+
+    // Resolve a pending request first (responses carry the requester's request_id).
+    if (!env.request_id().empty()) {
+        std::lock_guard lk(pending_mu_);
+        const auto it = pending_.find(env.request_id());
+        if (it != pending_.end()) {
+            it->second->set_value(env);
+            pending_.erase(it);
+            return;
+        }
+    }
 
     if (env.has_handshake_request()) {
         handle_handshake_request(id, endpoints_[id], env);

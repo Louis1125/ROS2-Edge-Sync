@@ -9,9 +9,11 @@
 
   <depend>edge_sync_base</depend>
   <depend>edge_sync_protocol</depend>
+  <depend>edge_sync_core</depend>
   <depend>libboost-system-dev</depend>
 
   <test_depend>gtest_vendor</test_depend>
+  <test_depend>edge_sync_storage</test_depend>
 
   <export>
     <build_type>cmake</build_type>

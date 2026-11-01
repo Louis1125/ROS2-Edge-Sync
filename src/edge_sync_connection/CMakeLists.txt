@@ -6,11 +6,13 @@ include(CMakePackageConfigHelpers)
 
 find_package(edge_sync_base REQUIRED)
 find_package(edge_sync_protocol REQUIRED)
+find_package(edge_sync_core REQUIRED)
 
 # --- Pure target: interfaces + ConnectionManager, no concrete transport. ---
 add_library(edge_sync_connection
   src/frame_codec.cpp
   src/connection_manager.cpp
+  src/sync_peer_adapter.cpp
 )
 add_library(edge_sync::connection ALIAS edge_sync_connection)
 set_target_properties(edge_sync_connection PROPERTIES EXPORT_NAME connection)
@@ -19,7 +21,7 @@ target_include_directories(edge_sync_connection PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_link_libraries(edge_sync_connection PUBLIC edge_sync::base edge_sync::protocol)
+target_link_libraries(edge_sync_connection PUBLIC edge_sync::base edge_sync::protocol edge_sync::core)
 
 # --- Asio transport target: implements ITransport over TCP. ---
 find_package(Boost REQUIRED)
@@ -42,6 +44,7 @@ target_link_libraries(edge_sync_connection_asio PUBLIC
 include(CTest)
 if(BUILD_TESTING)
   find_package(GTest REQUIRED)
+  find_package(edge_sync_storage REQUIRED)
   set(TEST_SUPPORT ${CMAKE_CURRENT_SOURCE_DIR}/../../tests/support)
 
   add_executable(test_frame_codec test/test_frame_codec.cpp)
@@ -55,10 +58,17 @@ if(BUILD_TESTING)
   target_link_libraries(test_reconnect PRIVATE edge_sync_connection edge_sync_connection_asio GTest::gtest GTest::gtest_main)
   target_include_directories(test_reconnect PRIVATE ${TEST_SUPPORT})
 
+  add_executable(test_sync test/test_sync.cpp)
+  target_link_libraries(test_sync PRIVATE
+    edge_sync_connection edge_sync_connection_asio edge_sync::storage edge_sync::core
+    GTest::gtest GTest::gtest_main)
+  target_include_directories(test_sync PRIVATE ${TEST_SUPPORT})
+
   include(GoogleTest)
   gtest_discover_tests(test_frame_codec)
   gtest_discover_tests(test_handshake)
   gtest_discover_tests(test_reconnect)
+  gtest_discover_tests(test_sync)
 endif()
 
 install(TARGETS edge_sync_connection EXPORT edge_sync_connectionTargets

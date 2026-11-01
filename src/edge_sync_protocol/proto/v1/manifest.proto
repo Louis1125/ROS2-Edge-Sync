@@ -13,10 +13,17 @@ message FileEntry {
 
 message ArtifactManifest {
     string artifact_id = 1;
-    string version = 2;
-    repeated FileEntry files = 3;
+    uint32 version_major = 2;
+    uint32 version_minor = 3;
+    uint32 version_patch = 4;
+    repeated FileEntry files = 5;
 }
 
 message ManifestRequest {
     string artifact_id = 1;
+}
+
+message ManifestResponse {
+    bool found = 1;
+    ArtifactManifest manifest = 2;
 }

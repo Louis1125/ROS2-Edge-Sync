@@ -1,9 +1,13 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <thread>
@@ -23,14 +27,13 @@ namespace edge_sync::connection {
 using ApplicationMessageHandler =
     std::function<void(const Peer&, const edge_sync::protocol::MessageEnvelope&)>;
 
-// Owns the transport, the peer registry, handshaking and session lifecycle.
-// This is the single entry point for all cross-robot communication. It depends
-// only on the ITransport interface, never on a concrete transport.
+// Owns the transport, the peer registry, handshaking, session lifecycle and
+// request/response correlation. This is the single entry point for all
+// cross-robot communication. It depends only on the ITransport interface.
 //
-// Thread-safety: all transport callbacks run on the transport's single I/O
-// thread, so this class's mutable state is only touched from that thread except
-// for start/connect_peer/stop, which are called from the owner thread before or
-// after the I/O loop is running.
+// Thread-safety: transport callbacks run on the transport's single I/O thread;
+// start/connect_peer/request/stop may be called from the owner thread. The
+// pending-request map is guarded by its own mutex.
 class ConnectionManager {
 public:
     ConnectionManager(std::unique_ptr<ITransport> transport, edge_sync::base::Logger& logger,
@@ -40,6 +43,13 @@ public:
 
     edge_sync::base::Result<void> start(const Endpoint& listen_endpoint);
     edge_sync::base::Result<void> connect_peer(const Endpoint& endpoint);
+
+    // Send `envelope` to `robot_id` and block up to `timeout` for a response
+    // envelope carrying the same request_id. This is the request/response
+    // primitive the sync engine builds on.
+    edge_sync::base::Result<edge_sync::protocol::MessageEnvelope> request(
+        const std::string& robot_id, edge_sync::protocol::MessageEnvelope envelope,
+        std::chrono::milliseconds timeout);
 
     edge_sync::base::Result<Session::Id> open_session(const std::string& robot_id);
     edge_sync::base::Result<void> close_session(Session::Id id);
@@ -78,6 +88,11 @@ private:
 
     std::map<Session::Id, std::string> sessions_;     // session -> robot id
     Session::Id next_session_id_{1};
+
+    std::uint64_t next_request_id_{1};
+    std::mutex pending_mu_;
+    std::map<std::string,
+             std::shared_ptr<std::promise<edge_sync::protocol::MessageEnvelope>>> pending_;
 
     RetryPolicy retry_;
     TimeoutConfig timeouts_;

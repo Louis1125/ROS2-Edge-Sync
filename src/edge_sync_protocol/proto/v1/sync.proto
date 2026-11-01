@@ -45,5 +45,6 @@ message MessageEnvelope {
         ChunkRequest chunk_request = 14;
         ChunkResponse chunk_response = 15;
         SyncResult sync_result = 16;
+        ManifestResponse manifest_response = 17;
     }
 }
