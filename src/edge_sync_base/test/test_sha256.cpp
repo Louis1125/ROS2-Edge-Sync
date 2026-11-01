@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "edge_sync_storage/sha256.hpp"
+#include "edge_sync_base/sha256.hpp"
 
-using edge_sync::storage::sha256_hex;
+using edge_sync::base::sha256_hex;
 
 TEST(Sha256Test, KnownVectors) {
     EXPECT_EQ(sha256_hex(std::string("")),

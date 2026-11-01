@@ -1,10 +1,10 @@
-#include "edge_sync_storage/sha256.hpp"
+#include "edge_sync_base/sha256.hpp"
 
 #include <array>
 #include <cstring>
 #include <vector>
 
-namespace edge_sync::storage {
+namespace edge_sync::base {
 namespace {
 
 constexpr std::array<std::uint32_t, 64> kRound = {
@@ -98,4 +98,4 @@ edge_sync::base::Hash sha256_hex(const std::string& data) {
     return sha256_hex(reinterpret_cast<const std::uint8_t*>(data.data()), data.size());
 }
 
-}  // namespace edge_sync::storage
+}  // namespace edge_sync::base

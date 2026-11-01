@@ -8,6 +8,7 @@ add_library(edge_sync_base
   src/error.cpp
   src/config.cpp
   src/logger.cpp
+  src/sha256.cpp
 )
 add_library(edge_sync::base ALIAS edge_sync_base)
 set_target_properties(edge_sync_base PROPERTIES EXPORT_NAME base)
@@ -21,7 +22,7 @@ target_include_directories(edge_sync_base PUBLIC
 include(CTest)
 if(BUILD_TESTING)
   find_package(GTest REQUIRED)
-  add_executable(test_edge_sync_base test/test_result.cpp test/test_config.cpp)
+  add_executable(test_edge_sync_base test/test_result.cpp test/test_config.cpp test/test_sha256.cpp)
   target_link_libraries(test_edge_sync_base PRIVATE edge_sync_base GTest::gtest GTest::gtest_main)
   include(GoogleTest)
   gtest_discover_tests(test_edge_sync_base)

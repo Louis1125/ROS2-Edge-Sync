@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <fstream>
 
-#include "edge_sync_storage/sha256.hpp"
+#include "edge_sync_base/sha256.hpp"
 
 namespace edge_sync::storage {
 namespace fs = std::filesystem;
@@ -22,7 +22,7 @@ edge_sync::base::Result<void> ObjectStore::initialize() {
 
 edge_sync::base::Result<edge_sync::base::Hash> ObjectStore::put(
     const edge_sync::base::ByteBuffer& data) {
-    const edge_sync::base::Hash hash = sha256_hex(data);
+    const edge_sync::base::Hash hash = edge_sync::base::sha256_hex(data);
     const std::string path = path_for(hash);
 
     std::error_code ec;

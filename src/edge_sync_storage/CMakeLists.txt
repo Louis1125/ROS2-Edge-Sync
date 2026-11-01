@@ -9,7 +9,6 @@ find_package(edge_sync_core REQUIRED)
 find_package(SQLite3 REQUIRED)
 
 add_library(edge_sync_storage
-  src/sha256.cpp
   src/object_store.cpp
   src/sqlite_repository.cpp
   src/artifact_repository.cpp
@@ -26,7 +25,7 @@ target_link_libraries(edge_sync_storage PUBLIC edge_sync::base edge_sync::core S
 include(CTest)
 if(BUILD_TESTING)
   find_package(GTest REQUIRED)
-  add_executable(test_edge_sync_storage test/test_sha256.cpp test/test_storage.cpp)
+  add_executable(test_edge_sync_storage test/test_storage.cpp)
   target_link_libraries(test_edge_sync_storage PRIVATE edge_sync_storage GTest::gtest GTest::gtest_main)
   include(GoogleTest)
   gtest_discover_tests(test_edge_sync_storage)
