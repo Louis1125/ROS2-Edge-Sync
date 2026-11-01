@@ -1,0 +1,104 @@
+openapi: 3.0.3
+info:
+  title: ROS2-Edge-Sync Control Plane API
+  version: 0.1.0
+  description: Fleet management, artifacts and sync-jobs for ROS 2 fleets.
+paths:
+  /api/v1/health:
+    get:
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+  /api/v1/robots:
+    get:
+      operationId: listRobots
+      responses:
+        '200':
+          description: Registered robots
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Robot' }
+  /api/v1/sync-jobs:
+    get:
+      operationId: listSyncJobs
+      responses:
+        '200':
+          description: Sync job history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SyncJob' }
+    post:
+      operationId: createSyncJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSyncJob' }
+      responses:
+        '201':
+          description: Job created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SyncJob' }
+  /api/v1/sync-jobs/{jobId}:
+    get:
+      operationId: getSyncJob
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Job details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SyncJob' }
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+components:
+  schemas:
+    Robot:
+      type: object
+      properties:
+        robotId: { type: string }
+        name: { type: string }
+        status: { type: string }
+        runtimeVersion: { type: string }
+        lastSeenMs: { type: integer, format: int64 }
+    CreateSyncJob:
+      type: object
+      required: [source_robot, target_robot, artifact_id]
+      properties:
+        source_robot: { type: string }
+        target_robot: { type: string }
+        artifact_id: { type: string }
+    SyncJob:
+      type: object
+      properties:
+        jobId: { type: string }
+        sourceRobot: { type: string }
+        targetRobot: { type: string }
+        artifact: { type: string }
+        status: { type: string }
+        transferredBytes: { type: integer, format: int64 }
+        totalBytes: { type: integer, format: int64 }
+        error: { type: string }
+    Error:
+      type: object
+      properties:
+        error: { type: string }
