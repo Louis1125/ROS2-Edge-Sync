@@ -18,6 +18,14 @@ using edge_sync::control_plane::SyncJobService;
 namespace {
 std::atomic<std::uint64_t> g_job_seq{0};
 
+// Constant-time comparison to avoid timing side-channels on the token.
+bool constant_time_eq(const std::string& a, const std::string& b) {
+    if (a.size() != b.size()) return false;
+    unsigned char diff = 0;
+    for (std::size_t i = 0; i < a.size(); ++i) diff |= static_cast<unsigned char>(a[i] ^ b[i]);
+    return diff == 0;
+}
+
 Json::Value error_json(const std::string& msg) {
     Json::Value v;
     v["error"] = msg;
@@ -64,6 +72,16 @@ int main(int argc, char** argv) {
         return 0;
     }
 
+    const std::string admin_token =
+        std::getenv("EDGE_SYNC_ADMIN_TOKEN") ? std::getenv("EDGE_SYNC_ADMIN_TOKEN") : "";
+    const auto authorized = [admin_token](const HttpRequestPtr& req) {
+        if (admin_token.empty()) return true;  // auth disabled when unconfigured
+        const std::string auth = req->getHeader("Authorization");
+        const std::string prefix = "Bearer ";
+        if (auth.rfind(prefix, 0) != 0) return false;
+        return constant_time_eq(auth.substr(prefix.size()), admin_token);
+    };
+
     auto robot_service = std::make_shared<RobotService>(db);
     edge_sync::base::ConsoleLogger logger(edge_sync::base::LogLevel::Info);
     auto gateway = std::make_shared<edge_sync::control_plane::AgentGateway>(db, logger);
@@ -105,9 +123,16 @@ int main(int argc, char** argv) {
                              cb(HttpResponse::newHttpJsonResponse(arr));
                          })
         .registerHandler("/api/v1/sync-jobs",
-                         [sync_job_service](const HttpRequestPtr& req,
+                         [sync_job_service, authorized](const HttpRequestPtr& req,
                                             std::function<void(const HttpResponsePtr&)>&& cb) {
                              if (req->getMethod() == Post) {
+                                 if (!authorized(req)) {
+                                     auto resp = HttpResponse::newHttpJsonResponse(
+                                         error_json("unauthorized"));
+                                     resp->setStatusCode(k401Unauthorized);
+                                     cb(resp);
+                                     return;
+                                 }
                                  const auto body = req->getJsonObject();
                                  if (!body) {
                                      cb(HttpResponse::newHttpJsonResponse(
