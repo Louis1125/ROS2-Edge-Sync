@@ -9,6 +9,7 @@
 #include "edge_sync_connection/connection_manager.hpp"
 #include "edge_sync_connection/sync_peer_adapter.hpp"
 #include "edge_sync_connection/tcp_transport.hpp"
+#include "edge_sync_core/manifest_builder.hpp"
 #include "edge_sync_core/sync_coordinator.hpp"
 #include "edge_sync_storage/artifact_repository.hpp"
 #include "edge_sync_storage/object_store.hpp"
@@ -40,12 +41,12 @@ void wait_for(const std::function<bool()>& predicate, int attempts = 100) {
 }
 }  // namespace
 
-// M1-A vertical slice: a coordinator on robot-a requests a manifest from robot-b
-// over a live TCP connection, and robot-b answers from its local repository.
-TEST(SyncTest, CoordinatorFetchesRemoteManifest) {
+// M1-B vertical slice: robot-a computes a chunk diff against robot-b's manifest
+// over a live TCP connection.
+TEST(SyncTest, CoordinatorPlansChunkDiffAgainstRemoteManifest) {
     CapturingLogger log;
 
-    // robot-b owns the artifact.
+    // robot-b owns an artifact "map-warehouse".
     const std::string b_root = tmp_dir("sync_b");
     auto b_sqlite = std::make_unique<SqliteRepository>(b_root + "/meta.sqlite");
     ASSERT_TRUE(b_sqlite->open().ok());
@@ -53,13 +54,18 @@ TEST(SyncTest, CoordinatorFetchesRemoteManifest) {
     ASSERT_TRUE(b_objects->initialize().ok());
     ArtifactRepository b_repo(*b_sqlite, *b_objects);
 
-    auto hash = b_objects->put(base::ByteBuffer{'m', 'a', 'p'});
-    ASSERT_TRUE(hash.ok());
-    Manifest m;
-    m.artifact_id = "map-warehouse";
-    m.version = {1, 4, 0};
-    m.files.push_back(FileEntry{"grid.pgm", hash.value(), 3, 1});
-    ASSERT_TRUE(b_repo.store(m).ok());
+    base::ByteBuffer data(100);
+    for (std::size_t i = 0; i < data.size(); ++i) data[i] = static_cast<std::uint8_t>(i);
+    auto manifest = build_manifest("map-warehouse", {1, 4, 0}, data, 32);
+    ASSERT_TRUE(manifest.ok());
+    for (const auto& c : manifest.value().chunks) {
+        base::ByteBuffer chunk(data.begin() + static_cast<std::ptrdiff_t>(c.offset),
+                               data.begin() + static_cast<std::ptrdiff_t>(c.offset + c.size));
+        auto h = b_objects->put(chunk);
+        ASSERT_TRUE(h.ok());
+        ASSERT_EQ(h.value(), c.hash);
+    }
+    ASSERT_TRUE(b_repo.store(manifest.value()).ok());
 
     auto b_conn = std::make_unique<ConnectionManager>(std::make_unique<TcpTransport>(), log);
     b_conn->set_local_identity("robot-b");
@@ -87,9 +93,9 @@ TEST(SyncTest, CoordinatorFetchesRemoteManifest) {
     ASSERT_TRUE(plan.ok()) << plan.error().message;
     EXPECT_EQ(plan.value().artifact_id, "map-warehouse");
     EXPECT_EQ(plan.value().remote_version.major, 1u);
-    ASSERT_EQ(plan.value().needed_files.size(), 1u);
-    EXPECT_EQ(plan.value().needed_files[0].path, "grid.pgm");
-    EXPECT_EQ(plan.value().needed_files[0].hash, hash.value());
+    EXPECT_EQ(plan.value().outcome, SyncOutcome::Partial);
+    EXPECT_EQ(plan.value().needed_chunks.size(), manifest.value().chunks.size());
+    EXPECT_EQ(plan.value().needed_chunks[0].hash, manifest.value().chunks[0].hash);
 
     a_conn->stop();
     b_conn->stop();

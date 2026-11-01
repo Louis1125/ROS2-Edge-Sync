@@ -34,13 +34,17 @@ edge_sync::core::Manifest to_core(const edge_sync::protocol::v1::ArtifactManifes
     edge_sync::core::Manifest out;
     out.artifact_id = m.artifact_id();
     out.version = {m.version_major(), m.version_minor(), m.version_patch()};
-    for (const auto& f : m.files()) {
-        edge_sync::core::FileEntry e;
-        e.path = f.path();
-        e.hash = bytes_to_hex(f.hash().digest());
-        e.size = f.size();
-        e.chunk_count = f.chunk_count();
-        out.files.push_back(std::move(e));
+    out.schema_version = m.schema_version();
+    out.total_size = m.total_size();
+    out.chunk_size = m.chunk_size();
+    out.artifact_hash = bytes_to_hex(m.artifact_hash().digest());
+    for (const auto& c : m.chunks()) {
+        edge_sync::core::ChunkDescriptor d;
+        d.index = c.index();
+        d.offset = c.offset();
+        d.size = c.size();
+        d.hash = bytes_to_hex(c.hash().digest());
+        out.chunks.push_back(std::move(d));
     }
     return out;
 }
@@ -51,13 +55,18 @@ void to_proto(const edge_sync::core::Manifest& in,
     out->set_version_major(in.version.major);
     out->set_version_minor(in.version.minor);
     out->set_version_patch(in.version.patch);
-    for (const auto& f : in.files) {
-        auto* fe = out->add_files();
-        fe->set_path(f.path);
-        fe->mutable_hash()->set_algorithm("sha256");
-        fe->mutable_hash()->set_digest(hex_to_bytes(f.hash));
-        fe->set_size(f.size);
-        fe->set_chunk_count(f.chunk_count);
+    out->set_schema_version(in.schema_version);
+    out->set_total_size(in.total_size);
+    out->set_chunk_size(in.chunk_size);
+    out->mutable_artifact_hash()->set_algorithm("sha256");
+    out->mutable_artifact_hash()->set_digest(hex_to_bytes(in.artifact_hash));
+    for (const auto& c : in.chunks) {
+        auto* pc = out->add_chunks();
+        pc->set_index(c.index);
+        pc->set_offset(c.offset);
+        pc->set_size(c.size);
+        pc->mutable_hash()->set_algorithm("sha256");
+        pc->mutable_hash()->set_digest(hex_to_bytes(c.hash));
     }
 }
 

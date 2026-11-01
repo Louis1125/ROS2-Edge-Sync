@@ -1,5 +1,9 @@
 #include "edge_sync_core/sync_coordinator.hpp"
 
+#include <optional>
+
+#include "edge_sync_core/sync_planner.hpp"
+
 namespace edge_sync::core {
 
 SyncCoordinator::SyncCoordinator(IRemotePeer& peers, IArtifactRepository& local_repository)
@@ -11,16 +15,15 @@ edge_sync::base::Result<SyncPlan> SyncCoordinator::prepare(
     auto remote = peers_.request_manifest(source_robot, artifact_id);
     if (!remote) return remote.error();
 
-    SyncPlan plan;
-    plan.artifact_id = artifact_id;
-    plan.remote_version = remote.value().version;
-
-    const auto local_exists = local_repository_.exists(artifact_id);
-    const bool needs_all = !local_exists.ok() || !local_exists.value();
-    if (needs_all) {
-        plan.needed_files = remote.value().files;
+    std::optional<Manifest> local;
+    const auto exists = local_repository_.exists(artifact_id);
+    if (exists.ok() && exists.value()) {
+        const auto loaded = local_repository_.load(artifact_id);
+        if (loaded.ok()) local = loaded.value();
     }
-    return plan;
+
+    SyncPlanner planner;
+    return planner.plan(local, remote.value());
 }
 
 }  // namespace edge_sync::core

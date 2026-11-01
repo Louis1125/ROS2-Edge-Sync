@@ -9,6 +9,8 @@ find_package(edge_sync_base REQUIRED)
 add_library(edge_sync_core
   src/version.cpp
   src/sync_coordinator.cpp
+  src/manifest_builder.cpp
+  src/sync_planner.cpp
 )
 add_library(edge_sync::core ALIAS edge_sync_core)
 set_target_properties(edge_sync_core PROPERTIES EXPORT_NAME core)
@@ -22,7 +24,7 @@ target_link_libraries(edge_sync_core PUBLIC edge_sync::base)
 include(CTest)
 if(BUILD_TESTING)
   find_package(GTest REQUIRED)
-  add_executable(test_edge_sync_core test/test_version.cpp)
+  add_executable(test_edge_sync_core test/test_version.cpp test/test_manifest.cpp test/test_planner.cpp)
   target_link_libraries(test_edge_sync_core PRIVATE edge_sync_core GTest::gtest GTest::gtest_main)
   include(GoogleTest)
   gtest_discover_tests(test_edge_sync_core)

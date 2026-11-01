@@ -4,11 +4,11 @@ package edge_sync.protocol.v1;
 
 import "v1/common.proto";
 
-message FileEntry {
-    string path = 1;
-    Hash hash = 2;
-    uint64 size = 3;
-    uint32 chunk_count = 4;
+message ChunkDescriptor {
+    uint64 index = 1;
+    uint64 offset = 2;
+    uint32 size = 3;
+    Hash hash = 4;
 }
 
 message ArtifactManifest {
@@ -16,7 +16,11 @@ message ArtifactManifest {
     uint32 version_major = 2;
     uint32 version_minor = 3;
     uint32 version_patch = 4;
-    repeated FileEntry files = 5;
+    uint32 schema_version = 5;
+    uint64 total_size = 6;
+    uint32 chunk_size = 7;
+    Hash artifact_hash = 8;
+    repeated ChunkDescriptor chunks = 9;
 }
 
 message ManifestRequest {

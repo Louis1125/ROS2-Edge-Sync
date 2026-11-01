@@ -3,11 +3,11 @@
 #include <filesystem>
 #include <string>
 
+#include "edge_sync_core/manifest_builder.hpp"
 #include "edge_sync_storage/artifact_repository.hpp"
 #include "edge_sync_storage/object_store.hpp"
 #include "edge_sync_storage/sqlite_repository.hpp"
 
-using edge_sync::core::FileEntry;
 using edge_sync::core::Manifest;
 using edge_sync::storage::ArtifactRepository;
 using edge_sync::storage::ObjectStore;
@@ -51,22 +51,23 @@ TEST(ArtifactRepositoryTest, StoreAndLoadManifest) {
     ArtifactRepository repo(sqlite, objects);
 
     edge_sync::base::ByteBuffer content{'m', 'a', 'p'};
-    auto hash = objects.put(content);
-    ASSERT_TRUE(hash.ok());
+    auto manifest = edge_sync::core::build_manifest("map-2024", {1, 2, 0}, content, 2);
+    ASSERT_TRUE(manifest.ok());
+    for (const auto& c : manifest.value().chunks) {
+        edge_sync::base::ByteBuffer chunk(
+            content.begin() + static_cast<std::ptrdiff_t>(c.offset),
+            content.begin() + static_cast<std::ptrdiff_t>(c.offset + c.size));
+        ASSERT_TRUE(objects.put(chunk).ok());
+    }
 
-    Manifest m;
-    m.artifact_id = "map-2024";
-    m.version = {1, 2, 0};
-    m.files.push_back(FileEntry{"grid.pgm", hash.value(), content.size(), 1});
-
-    ASSERT_TRUE(repo.store(m).ok());
+    ASSERT_TRUE(repo.store(manifest.value()).ok());
     ASSERT_TRUE(repo.exists("map-2024").value());
 
     auto loaded = repo.load("map-2024");
     ASSERT_TRUE(loaded.ok());
     EXPECT_EQ(loaded.value().artifact_id, "map-2024");
-    ASSERT_EQ(loaded.value().files.size(), 1u);
-    EXPECT_EQ(loaded.value().files[0].hash, hash.value());
+    ASSERT_EQ(loaded.value().chunks.size(), manifest.value().chunks.size());
+    EXPECT_EQ(loaded.value().artifact_hash, manifest.value().artifact_hash);
 
     sqlite.close();
 }
