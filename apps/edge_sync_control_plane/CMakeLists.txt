@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(edge_sync_base REQUIRED)
 find_package(edge_sync_core REQUIRED)
+find_package(edge_sync_connection REQUIRED)
+find_package(edge_sync_connection_asio REQUIRED)
 find_package(Drogon REQUIRED)
 find_package(PostgreSQL REQUIRED)
 
@@ -13,11 +15,14 @@ add_executable(edge_sync_control_plane
   src/database.cpp
   src/robot_service.cpp
   src/sync_job_service.cpp
+  src/agent_gateway.cpp
 )
 target_include_directories(edge_sync_control_plane PRIVATE include)
 target_link_libraries(edge_sync_control_plane PRIVATE
   edge_sync::base
   edge_sync::core
+  edge_sync::connection
+  edge_sync::connection_asio
   Drogon::Drogon
   PostgreSQL::PostgreSQL
 )

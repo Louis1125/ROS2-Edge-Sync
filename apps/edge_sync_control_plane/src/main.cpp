@@ -3,6 +3,8 @@
 #include <atomic>
 #include <string>
 
+#include "edge_sync_base/logger.hpp"
+#include "edge_sync_control_plane/application/agent_gateway.hpp"
 #include "edge_sync_control_plane/application/robot_service.hpp"
 #include "edge_sync_control_plane/application/sync_job_service.hpp"
 #include "edge_sync_control_plane/infrastructure/database.hpp"
@@ -63,6 +65,15 @@ int main(int argc, char** argv) {
     }
 
     auto robot_service = std::make_shared<RobotService>(db);
+    edge_sync::base::ConsoleLogger logger(edge_sync::base::LogLevel::Info);
+    auto gateway = std::make_shared<edge_sync::control_plane::AgentGateway>(db, logger);
+
+    const std::string fleet_secret = std::getenv("EDGE_SYNC_FLEET_SECRET")
+                                         ? std::getenv("EDGE_SYNC_FLEET_SECRET")
+                                         : "";
+    if (auto r = gateway->start(7443, fleet_secret); !r) {
+        LOG_WARN << "agent gateway failed to start: " << r.error().message;
+    }
     auto sync_job_service = std::make_shared<SyncJobService>(db);
 
     app()

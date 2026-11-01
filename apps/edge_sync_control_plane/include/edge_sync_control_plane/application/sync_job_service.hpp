@@ -19,13 +19,18 @@ public:
 
     edge_sync::base::Result<SyncJob> create(const std::string& source, const std::string& target,
                                             const std::string& artifact_id) {
+        const std::string job_id = make_job_id();
+        // Transactional outbox: the job and its dispatch intent commit together.
+        if (auto r = db_.enqueue_sync_job(job_id, job_id, source, target, artifact_id); !r) {
+            return r.error();
+        }
         SyncJob job;
-        job.job_id = make_job_id();
+        job.job_id = job_id;
         job.source_robot = source;
         job.target_robot = target;
         job.artifact_id = artifact_id;
         job.status = "queued";
-        return db_.create_sync_job(job);
+        return job;
     }
 
     edge_sync::base::Result<std::vector<SyncJob>> list() { return db_.list_sync_jobs(); }

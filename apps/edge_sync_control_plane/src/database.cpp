@@ -156,4 +156,117 @@ edge_sync::base::Result<void> Database::update_sync_job_status(const std::string
     return execute(sql);
 }
 
+edge_sync::base::Result<void> Database::enqueue_sync_job(
+    const std::string& job_id, const std::string& command_id, const std::string& source_robot,
+    const std::string& target_robot, const std::string& artifact_id) {
+    // Single transaction: the job and its outbox event commit together.
+    if (auto r = execute("BEGIN"); !r) return r.error();
+    const std::vector<std::string> p1{job_id, source_robot, target_robot, artifact_id,
+                                      command_id, "pending"};
+    const auto now = std::to_string(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count());
+    // Use PQexecParams for user-controlled values (injection-safe).
+    {
+        const char* sql =
+            "INSERT INTO sync_jobs(job_id, source_robot, target_robot, artifact_id, status, "
+            "command_id, delivery_state, transferred_bytes, total_bytes, error, updated_at) "
+            "VALUES($1,$2,$3,$4,'queued',$5,'pending',0,0,'',$6)";
+        const char* vals[6] = {p1[0].c_str(), p1[1].c_str(), p1[2].c_str(), p1[3].c_str(),
+                               p1[4].c_str(), now.c_str()};
+        PGresult* res = PQexecParams(conn_, sql, 6, nullptr, vals, nullptr, nullptr, 0);
+        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+            const auto err = std::string(PQerrorMessage(conn_));
+            PQclear(res);
+            execute("ROLLBACK");
+            return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
+                                          "postgres: " + err};
+        }
+        PQclear(res);
+    }
+    {
+        const char* sql =
+            "INSERT INTO outbox(command_id, target_robot, source_robot, artifact_id, "
+            "delivery_state, attempts, created_at) VALUES($1,$2,$3,$4,'pending',0,$5)";
+        const char* vals[5] = {command_id.c_str(), target_robot.c_str(), source_robot.c_str(),
+                               artifact_id.c_str(), now.c_str()};
+        PGresult* res = PQexecParams(conn_, sql, 5, nullptr, vals, nullptr, nullptr, 0);
+        if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+            const auto err = std::string(PQerrorMessage(conn_));
+            PQclear(res);
+            execute("ROLLBACK");
+            return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
+                                          "postgres: " + err};
+        }
+        PQclear(res);
+    }
+    return execute("COMMIT");
+}
+
+edge_sync::base::Result<std::vector<Database::OutboxEntry>> Database::poll_outbox() {
+    PGresult* res = PQexec(conn_,
+                           "SELECT command_id, target_robot, source_robot, artifact_id "
+                           "FROM outbox WHERE delivery_state IN ('pending','dispatched') "
+                           "ORDER BY id");
+    if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+        const auto err = std::string(PQerrorMessage(conn_));
+        PQclear(res);
+        return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
+                                      "postgres: " + err};
+    }
+    std::vector<OutboxEntry> out;
+    for (int i = 0; i < PQntuples(res); ++i) {
+        out.push_back({PQgetvalue(res, i, 0), PQgetvalue(res, i, 1), PQgetvalue(res, i, 2),
+                       PQgetvalue(res, i, 3)});
+    }
+    PQclear(res);
+    return out;
+}
+
+edge_sync::base::Result<void> Database::mark_outbox(const std::string& command_id,
+                                                    const std::string& delivery_state) {
+    const char* sql = "UPDATE outbox SET delivery_state=$1, attempts=attempts+1 WHERE command_id=$2";
+    const char* vals[2] = {delivery_state.c_str(), command_id.c_str()};
+    PGresult* res = PQexecParams(conn_, sql, 2, nullptr, vals, nullptr, nullptr, 0);
+    const bool ok = PQresultStatus(res) == PGRES_COMMAND_OK;
+    const auto err = std::string(PQerrorMessage(conn_));
+    PQclear(res);
+    if (!ok) return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
+                                           "postgres: " + err};
+    return {};
+}
+
+edge_sync::base::Result<void> Database::update_job_execution(const std::string& command_id,
+                                                             const std::string& status,
+                                                             const std::string& error) {
+    const char* sql =
+        "UPDATE sync_jobs SET status=$1, error=$2, delivery_state='acknowledged' "
+        "WHERE command_id=$3";
+    const char* vals[3] = {status.c_str(), error.c_str(), command_id.c_str()};
+    PGresult* res = PQexecParams(conn_, sql, 3, nullptr, vals, nullptr, nullptr, 0);
+    const bool ok = PQresultStatus(res) == PGRES_COMMAND_OK;
+    const auto err = std::string(PQerrorMessage(conn_));
+    PQclear(res);
+    if (!ok) return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
+                                           "postgres: " + err};
+    return {};
+}
+
+edge_sync::base::Result<void> Database::upsert_agent_session(const std::string& robot_id) {
+    const char* sql =
+        "INSERT INTO agent_sessions(robot_id, connected_at, last_seen_at) VALUES($1,$2,$2) "
+        "ON CONFLICT(robot_id) DO UPDATE SET last_seen_at=$2";
+    const auto now = std::to_string(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count());
+    const char* vals[2] = {robot_id.c_str(), now.c_str()};
+    PGresult* res = PQexecParams(conn_, sql, 2, nullptr, vals, nullptr, nullptr, 0);
+    const bool ok = PQresultStatus(res) == PGRES_COMMAND_OK;
+    const auto err = std::string(PQerrorMessage(conn_));
+    PQclear(res);
+    if (!ok) return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
+                                           "postgres: " + err};
+    return {};
+}
+
 }  // namespace edge_sync::control_plane
