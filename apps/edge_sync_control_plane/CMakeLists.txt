@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(edge_sync_control_plane VERSION 0.1.0 LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(edge_sync_base REQUIRED)
 find_package(edge_sync_core REQUIRED)
@@ -11,7 +13,6 @@ add_executable(edge_sync_control_plane
   src/database.cpp
   src/robot_service.cpp
 )
-target_compile_features(edge_sync_control_plane PRIVATE cxx_std_20)
 target_include_directories(edge_sync_control_plane PRIVATE include)
 target_link_libraries(edge_sync_control_plane PRIVATE
   edge_sync::base
