@@ -59,6 +59,7 @@ local_up() {
 
   # frontend (Vite dev server proxying /api to the control plane)
   docker run -d --name edge-sync-web --network edge-sync-net -p 5173:5173 \
+    -e VITE_API_TARGET=http://edge-sync-cp:8080 \
     -v "$ROOT/web":/app -w /app node:20-alpine \
     sh -c 'npm install >/dev/null 2>&1 && npx vite --host --port 5173' >/dev/null
 
