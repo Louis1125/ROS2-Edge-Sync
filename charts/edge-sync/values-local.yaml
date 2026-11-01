@@ -1,0 +1,11 @@
+# Local development / demo preset.
+profile: local
+postgres:
+  enabled: true
+  storage: 1Gi
+ingress:
+  enabled: false
+resources:
+  controlPlane:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: "1", memory: 256Mi }

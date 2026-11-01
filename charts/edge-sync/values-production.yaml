@@ -1,0 +1,20 @@
+# Production-oriented preset: external PostgreSQL, TLS, HA.
+profile: production
+replicaCount: 2
+postgres:
+  enabled: false
+  host: postgres.example.internal
+  database: edge_sync
+  user: edge_sync
+ingress:
+  enabled: true
+  className: nginx
+  host: edge-sync.example.com
+  tlsSecret: edge-sync-tls
+resources:
+  controlPlane:
+    requests: { cpu: 200m, memory: 256Mi }
+    limits: { cpu: "2", memory: 1Gi }
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
