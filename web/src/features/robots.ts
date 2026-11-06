@@ -1,4 +1,4 @@
-import { api, Robot } from '../shared/api/client';
+import { api } from '../shared/api/client';
 import { statusBadge, emptyState } from '../shared/components/status';
 
 export async function renderRobots(): Promise<string> {

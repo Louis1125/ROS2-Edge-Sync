@@ -1,4 +1,4 @@
-import { api, Robot, SyncJob } from '../shared/api/client';
+import { api } from '../shared/api/client';
 
 export async function renderOverview(): Promise<string> {
   const [robots, jobs] = await Promise.all([api.robots(), api.syncJobs()]);

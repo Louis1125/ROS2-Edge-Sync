@@ -1,30 +1,30 @@
-name: build
+name: build-test
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 jobs:
-  colcon-build:
+  colcon-build-test:
     runs-on: ubuntu-24.04
     container:
-      image: osrf/ros:jazzy-desktop
+      image: osrf/ros:humble-desktop
     steps:
       - name: Install dependencies
         run: |
           apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build python3-colcon-common-extensions \
-            libboost-system-dev libasio-dev libssl-dev protobuf-compiler libprotobuf-dev \
-            libsqlite3-dev libzstd-dev libspdlog-dev libgtest-dev \
+            build-essential cmake python3-colcon-common-extensions \
+            libboost-system-dev libssl-dev protobuf-compiler libprotobuf-dev \
+            libsqlite3-dev libgtest-dev \
             && rm -rf /var/lib/apt/lists/*
       - uses: actions/checkout@v4
       - name: Build
         run: |
-          . /opt/ros/jazzy/setup.sh
+          . /opt/ros/humble/setup.sh
           colcon build --event-handlers console_direct+
       - name: Test
         run: |
-          . /opt/ros/jazzy/setup.sh
+          . /opt/ros/humble/setup.sh
           colcon test --event-handlers console_direct+
           colcon test-result --verbose

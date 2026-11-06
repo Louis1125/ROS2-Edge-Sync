@@ -2,20 +2,26 @@ name: lint
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 jobs:
-  clang-format:
+  lint:
     runs-on: ubuntu-24.04
     container:
-      image: osrf/ros:jazzy-desktop
+      image: osrf/ros:humble-desktop
     steps:
       - name: Install clang-format
         run: |
           apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            clang-format clang-tidy && rm -rf /var/lib/apt/lists/*
+            clang-format && rm -rf /var/lib/apt/lists/*
       - uses: actions/checkout@v4
       - name: Check formatting
         run: |
           find src -name '*.hpp' -o -name '*.cpp' | xargs clang-format --dry-run --Werror
+  helm-lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint charts/edge-sync

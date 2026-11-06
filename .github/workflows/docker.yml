@@ -2,13 +2,17 @@ name: docker
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 jobs:
-  build-image:
+  build-images:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Build runtime image
-        run: docker build -f docker/Dockerfile.runtime -t ros2-edge-sync:ci .
+      - name: Build Drogon base image
+        run: docker build -f docker/drogon-base.Dockerfile -t edge-sync-drogon-base .
+      - name: Build control-plane runtime image
+        run: docker build -f docker/control-plane.Dockerfile -t edge-sync-cp-runtime .
+      - name: Build frontend image
+        run: docker build -f docker/frontend.Dockerfile -t edge-sync-web .
