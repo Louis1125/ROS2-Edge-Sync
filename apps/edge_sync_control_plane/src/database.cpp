@@ -33,7 +33,7 @@ edge_sync::base::Result<void> Database::execute(const std::string& sql) {
     PGresult* res = PQexec(conn_, sql.c_str());
     const bool ok = PQresultStatus(res) == PGRES_COMMAND_OK ||
                     PQresultStatus(res) == PGRES_TUPLES_OK;
-    const auto err = std::string(PQerrorMessage(conn_));
+    const auto err = std::string(PQresultErrorMessage(res));
     PQclear(res);
     if (!ok) {
         return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
@@ -61,7 +61,7 @@ edge_sync::base::Result<std::vector<RobotRecord>> Database::list_robots() {
     PGresult* res = PQexec(conn_, "SELECT robot_id, name, status, runtime_version, last_seen_ms "
                                  "FROM robots ORDER BY robot_id");
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        const auto err = std::string(PQerrorMessage(conn_));
+        const auto err = std::string(PQresultErrorMessage(res));
         PQclear(res);
         return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure, "postgres: " + err};
     }
@@ -104,7 +104,7 @@ edge_sync::base::Result<std::vector<SyncJob>> Database::list_sync_jobs() {
                                  "status, transferred_bytes, total_bytes, error FROM sync_jobs "
                                  "ORDER BY job_id");
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        const auto err = std::string(PQerrorMessage(conn_));
+        const auto err = std::string(PQresultErrorMessage(res));
         PQclear(res);
         return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure, "postgres: " + err};
     }
@@ -176,7 +176,7 @@ edge_sync::base::Result<void> Database::enqueue_sync_job(
                                p1[4].c_str(), now.c_str()};
         PGresult* res = PQexecParams(conn_, sql, 6, nullptr, vals, nullptr, nullptr, 0);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            const auto err = std::string(PQerrorMessage(conn_));
+            const auto err = std::string(PQresultErrorMessage(res));
             PQclear(res);
             execute("ROLLBACK");
             return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
@@ -192,7 +192,7 @@ edge_sync::base::Result<void> Database::enqueue_sync_job(
                                artifact_id.c_str(), now.c_str()};
         PGresult* res = PQexecParams(conn_, sql, 5, nullptr, vals, nullptr, nullptr, 0);
         if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-            const auto err = std::string(PQerrorMessage(conn_));
+            const auto err = std::string(PQresultErrorMessage(res));
             PQclear(res);
             execute("ROLLBACK");
             return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
@@ -209,7 +209,7 @@ edge_sync::base::Result<std::vector<Database::OutboxEntry>> Database::poll_outbo
                            "FROM outbox WHERE delivery_state IN ('pending','dispatched') "
                            "ORDER BY id");
     if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-        const auto err = std::string(PQerrorMessage(conn_));
+        const auto err = std::string(PQresultErrorMessage(res));
         PQclear(res);
         return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
                                       "postgres: " + err};
@@ -229,7 +229,7 @@ edge_sync::base::Result<void> Database::mark_outbox(const std::string& command_i
     const char* vals[2] = {delivery_state.c_str(), command_id.c_str()};
     PGresult* res = PQexecParams(conn_, sql, 2, nullptr, vals, nullptr, nullptr, 0);
     const bool ok = PQresultStatus(res) == PGRES_COMMAND_OK;
-    const auto err = std::string(PQerrorMessage(conn_));
+    const auto err = std::string(PQresultErrorMessage(res));
     PQclear(res);
     if (!ok) return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
                                            "postgres: " + err};
@@ -245,7 +245,7 @@ edge_sync::base::Result<void> Database::update_job_execution(const std::string& 
     const char* vals[3] = {status.c_str(), error.c_str(), command_id.c_str()};
     PGresult* res = PQexecParams(conn_, sql, 3, nullptr, vals, nullptr, nullptr, 0);
     const bool ok = PQresultStatus(res) == PGRES_COMMAND_OK;
-    const auto err = std::string(PQerrorMessage(conn_));
+    const auto err = std::string(PQresultErrorMessage(res));
     PQclear(res);
     if (!ok) return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
                                            "postgres: " + err};
@@ -262,7 +262,7 @@ edge_sync::base::Result<void> Database::upsert_agent_session(const std::string& 
     const char* vals[2] = {robot_id.c_str(), now.c_str()};
     PGresult* res = PQexecParams(conn_, sql, 2, nullptr, vals, nullptr, nullptr, 0);
     const bool ok = PQresultStatus(res) == PGRES_COMMAND_OK;
-    const auto err = std::string(PQerrorMessage(conn_));
+    const auto err = std::string(PQresultErrorMessage(res));
     PQclear(res);
     if (!ok) return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
                                            "postgres: " + err};
@@ -280,7 +280,7 @@ edge_sync::base::Result<void> Database::touch_robot(const std::string& robot_id)
     const char* vals[2] = {robot_id.c_str(), now.c_str()};
     PGresult* res = PQexecParams(conn_, sql, 2, nullptr, vals, nullptr, nullptr, 0);
     const bool ok = PQresultStatus(res) == PGRES_COMMAND_OK;
-    const auto err = std::string(PQerrorMessage(conn_));
+    const auto err = std::string(PQresultErrorMessage(res));
     PQclear(res);
     if (!ok) return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
                                            "postgres: " + err};

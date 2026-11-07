@@ -26,6 +26,9 @@ docker run -d --name e2e-cp --network "$NET" -p 8080:8080 --entrypoint /bin/bash
     export EDGE_SYNC_FLEET_SECRET='"$SECRET"'
     exec /workspace/build/control/edge_sync_control_plane' >/dev/null
 
+for i in $(seq 1 30); do curl -fsS http://localhost:8080/api/v1/health >/dev/null 2>&1 && break; sleep 1; done
+curl -fsS http://localhost:8080/api/v1/health >/dev/null 2>&1 || { echo "control plane not healthy"; docker logs e2e-cp | tail -20; exit 1; }
+
 cat > /tmp/e2e-a.yaml <<A_EOF
 robot:
   id: robot-a
@@ -89,7 +92,11 @@ curl -s -X POST -H 'Content-Type: application/json' \
   -d '{"source_robot":"robot-a","target_robot":"robot-b","artifact_id":"map-1"}' \
   http://localhost:8080/api/v1/sync-jobs; echo
 
-sleep 8
+for i in $(seq 1 40); do
+  JOB_STATUS=$(curl -s http://localhost:8080/api/v1/sync-jobs | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['status'] if d else '')" 2>/dev/null || true)
+  case "$JOB_STATUS" in succeeded|failed|cancelled) break;; esac
+  sleep 1
+done
 echo "=== job state ==="
 curl -s http://localhost:8080/api/v1/sync-jobs; echo
 echo "=== control plane dispatch/status ==="
