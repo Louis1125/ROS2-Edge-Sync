@@ -33,7 +33,28 @@ Each commit should be independently buildable and testable.
 
 ## Pull requests
 
-1. Open an issue describing the change first where non-trivial.
-2. Keep changes focused on a single module.
-3. Add tests for new behavior.
-4. Ensure `clang-format` and CI pass.
+External contributors submit changes via pull requests from a fork.
+
+### Workflow
+
+1. **Fork** the repository and clone your fork.
+2. **Create a feature branch** off `master` (never commit directly to `master`).
+3. **Make focused changes** — one logical change per PR; keep commits atomic with clear messages.
+4. **Run the checks** before submitting: `colcon build && colcon test`, and
+   `clang-format` on C++ changes.
+5. **Submit the PR** with a clear title and a description covering *what*,
+   *why*, and *how it was tested* (use the PR template).
+6. **Link the issue** it resolves, if one exists.
+
+### Review requirements
+
+- All GitHub Actions checks must pass (build-test, lint, frontend, docker).
+- At least one maintainer approval is required before merge.
+- Avoid force-pushing after review has started; push new commits instead.
+- Keep the PR small and reviewable; split unrelated changes.
+
+### First contribution
+
+Look for issues labelled `good first issue` (add the label as the project grows).
+If you are unsure how to start, open an issue describing what you want to work on.
+
