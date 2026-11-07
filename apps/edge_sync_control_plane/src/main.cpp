@@ -1,6 +1,8 @@
 #include <drogon/drogon.h>
 
 #include <atomic>
+#include <chrono>
+#include <thread>
 #include <string>
 
 #include "edge_sync_base/logger.hpp"
@@ -57,8 +59,16 @@ int main(int argc, char** argv) {
                                      "password=edge_sync";
 
     Database db(db_url);
-    if (auto r = db.connect(); !r) {
-        LOG_ERROR << r.error().message;
+    bool connected = false;
+    for (int i = 0; i < 30; ++i) {
+        if (db.connect().ok()) {
+            connected = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    if (!connected) {
+        LOG_ERROR << "could not connect to postgres after 30 retries";
         return 1;
     }
     const char* mig = std::getenv("MIGRATIONS_DIR") ? std::getenv("MIGRATIONS_DIR")
