@@ -1,44 +1,50 @@
 # ROS2-Edge-Sync
 
-**Reliable distributed state and artifact synchronization for ROS 2 fleets.**
+Reliable distributed artifact synchronization and fleet coordination for ROS 2
+robot fleets over unreliable networks.
 
-A C++20 modular monolith that synchronizes configuration, maps, task
-descriptions and software versions across ROS 2 robots over unreliable networks.
+**Status: Alpha.** The core synchronization engine, control plane, and K3s
+deployment are implemented and tested, but the project is **not
+production-ready** — see "Status & limitations" below.
 
-> **Status:** working vertical slice. The runtime starts, loads config, opens
-> storage, runs an Asio TCP server, connects to a peer, completes the protocol
-> handshake, manages sessions/reconnect and shuts down gracefully — verified
-> across two processes and two Docker containers. Synchronization algorithms are
-> next (M4).
+## What it does
 
-## Design principles
+- **Receiver-driven synchronization** — the control plane dispatches a command
+  to the *target* robot, which pulls the artifact from the *source* robot over
+  the peer-to-peer data plane, verifies SHA-256, and activates it atomically.
+- **Durable command dispatch** — a PostgreSQL transactional outbox, delivery vs.
+  execution state, and agent reconnection/offline recovery.
+- **Control plane** — Drogon + PostgreSQL, robot registry with heartbeat-based
+  online/offline, sync-job API with bearer auth.
+- **Deployment** — Docker (local), Helm/K3s (edge), unified `./edge-sync` CLI.
 
-Offline-first · content-addressable storage · incremental sync · fault-tolerant
-transfer · versioned state · secure sync · modular architecture.
-
-## Packages
-
-| Package | Responsibility |
-| --- | --- |
-| `edge_sync_base` | types, Result/Error, logging, config |
-| `edge_sync_protocol` | protobuf wire protocol + envelope codec |
-| `edge_sync_core` | domain model + repository interfaces |
-| `edge_sync_connection` | Connection Foundation + Asio TCP transport |
-| `edge_sync_storage` | SQLite + content-addressed object store |
-| `edge_sync_interfaces` | ROS 2 msg/srv/action |
-| `edge_sync_ros2` | ROS 2 adapter node |
-| `edge_sync_runtime` | composition root (`edge_syncd`) |
-
-## Build
+## Quick start
 
 ```bash
-source /opt/ros/$ROS_DISTRO/setup.bash
-colcon build && colcon test
+git clone <repo-url> && cd ros2-edge-sync
+./edge-sync up --mode local     # builds/pulls images, migrates, waits for health
+./edge-sync status              # service states, URLs, robots, jobs
+./edge-sync doctor              # diagnose the environment
+./edge-sync down                # stop (preserves data; --reset deletes it)
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/BUILD.md](docs/BUILD.md),
-and [docs/decisions/](docs/decisions/).
+Web console at http://localhost:5173 (API at :8080). See
+[COMMANDS.md](COMMANDS.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Status & limitations (accurate as of 2026-11-07)
+
+- ✅ K3s deployment **and** functional acceptance pass on a real k3d cluster:
+  two-agent sync (SHA-256 byte-identical), restart recovery, network
+  interruption, Helm upgrade/rollback, PostgreSQL backup/restore — see
+  [docs/release/K3S_ACCEPTANCE.md](docs/release/K3S_ACCEPTANCE.md).
+- ⚠️ **Receiver-driven architecture**: the source robot is a peer-to-peer
+  source, not a registered control-plane agent.
+- ⚠️ Verified with a **200 KB** artifact; artifacts **> 100 MB** are untested.
+- ⚠️ **Repeated-sync deduplication** under repetition is untested.
+- ⚠️ **Gateway TLS is not implemented** — the robot gateway is plaintext (HMAC
+  handshake only). Do not expose it to untrusted networks.
+- ⚠️ This is **Alpha software**, not production-ready.
 
 ## License
 
-MIT.
+MIT — see [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
