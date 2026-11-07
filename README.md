@@ -1,5 +1,7 @@
 # ROS2-Edge-Sync
 
+[![build-test](https://github.com/Louis1125/ROS2-Edge-Sync/actions/workflows/build.yml/badge.svg)](https://github.com/Louis1125/ROS2-Edge-Sync/actions)
+
 Reliable distributed artifact synchronization and fleet coordination for ROS 2
 robot fleets over unreliable networks.
 
