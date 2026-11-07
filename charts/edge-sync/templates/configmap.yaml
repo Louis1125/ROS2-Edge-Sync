@@ -5,4 +5,4 @@ metadata:
   labels:
     {{- include "edge-sync.labels" . | nindent 4 }}
 data:
-  database-url: host={{ .Values.postgres.host }} port={{ .Values.postgres.port }} dbname={{ .Values.postgres.database }} user={{ .Values.postgres.user }} password={{ .Values.postgres.password }}
+  database-url: host={{ if .Values.postgres.enabled }}{{ include "edge-sync.fullname" . }}-postgres{{ else }}{{ .Values.postgres.host }}{{ end }} port={{ .Values.postgres.port }} dbname={{ .Values.postgres.database }} user={{ .Values.postgres.user }} password={{ .Values.postgres.password }}

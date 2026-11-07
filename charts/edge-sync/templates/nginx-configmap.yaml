@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "edge-sync.fullname" . }}-nginx
+  labels:
+    {{- include "edge-sync.labels" . | nindent 4 }}
+data:
+  default.conf: |
+    server {
+      listen 80;
+      root /usr/share/nginx/html;
+      location /api/ { proxy_pass http://{{ include "edge-sync.fullname" . }}-control-plane:8080; }
+      location /events/ { proxy_pass http://{{ include "edge-sync.fullname" . }}-control-plane:8080; }
+      location / { try_files $uri /index.html; }
+    }
