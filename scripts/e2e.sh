@@ -4,7 +4,7 @@
 # -> transfer -> verify -> activate -> persisted success.
 set -euo pipefail
 
-WORKSPACE=/home/louis/edge-sync-build
+WORKSPACE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"  # repo root (must be built: install/ + build/control/)
 NET=edge-e2e
 SECRET=test-secret
 rm -rf /tmp/e2e-a /tmp/e2e-b && mkdir -p /tmp/e2e-a /tmp/e2e-b

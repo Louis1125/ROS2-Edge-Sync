@@ -3,7 +3,7 @@
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "ROS2-Edge-Sync SBOM",
-  "documentNamespace": "https://github.com/Louis1125/ROS2-Edge-Sync/sbom",
+  "documentNamespace": "https://github.com/ros2-edge-sync/sbom",
   "creationInfo": {
     "created": "2026-11-07T00:00:00Z",
     "creators": ["Tool: manual"]
