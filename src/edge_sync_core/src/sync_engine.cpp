@@ -10,7 +10,7 @@ namespace edge_sync::core {
 namespace {
 
 class VerifyingReceiver final : public IChunkReceiver {
-public:
+   public:
     VerifyingReceiver(IArtifactStore& store, const Manifest& manifest)
         : store_(store), manifest_(manifest) {}
 
@@ -37,8 +37,8 @@ public:
         // Identical content may appear at multiple offsets; assemble it at each.
         for (const auto& c : manifest_.chunks) {
             if (c.hash == h) {
-                if (auto r = store_.stage_chunk(manifest_.artifact_id, manifest_.version, c,
-                                                data); !r) {
+                if (auto r = store_.stage_chunk(manifest_.artifact_id, manifest_.version, c, data);
+                    !r) {
                     return r.error();
                 }
             }
@@ -46,7 +46,7 @@ public:
         return {};
     }
 
-private:
+   private:
     IArtifactStore& store_;
     const Manifest& manifest_;
 };
@@ -60,19 +60,23 @@ SyncEngine::SyncEngine(IRemotePeer& peers, IArtifactRepository& repository, ITra
 edge_sync::base::Result<SyncOutcome> SyncEngine::synchronize(
     const edge_sync::base::RobotId& source, const edge_sync::base::ArtifactId& artifact_id) {
     auto remote = peers_.request_manifest(source, artifact_id);
-    if (!remote) return remote.error();
+    if (!remote)
+        return remote.error();
 
     std::optional<Manifest> local;
     const auto exists = repository_.exists(artifact_id);
     if (exists.ok() && exists.value()) {
         const auto loaded = repository_.load(artifact_id);
-        if (loaded.ok()) local = loaded.value();
+        if (loaded.ok())
+            local = loaded.value();
     }
 
     SyncPlanner planner;
     auto plan = planner.plan(local, remote.value());
-    if (!plan) return plan.error();
-    if (plan.value().outcome == SyncOutcome::Identical) return SyncOutcome::Identical;
+    if (!plan)
+        return plan.error();
+    if (plan.value().outcome == SyncOutcome::Identical)
+        return SyncOutcome::Identical;
     if (plan.value().outcome == SyncOutcome::VersionConflict) {
         return SyncOutcome::VersionConflict;
     }
@@ -85,8 +89,10 @@ edge_sync::base::Result<SyncOutcome> SyncEngine::synchronize(
         return r.error();
     }
 
-    if (auto r = store_.commit(remote.value()); !r) return r.error();
-    if (auto r = repository_.store(remote.value()); !r) return r.error();
+    if (auto r = store_.commit(remote.value()); !r)
+        return r.error();
+    if (auto r = repository_.store(remote.value()); !r)
+        return r.error();
 
     return SyncOutcome::Partial;  // transfer completed (was a partial diff)
 }

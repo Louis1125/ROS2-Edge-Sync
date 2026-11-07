@@ -9,7 +9,7 @@ namespace edge_sync::core {
 // Inner-boundary port that the storage layer implements. Core logic depends on
 // this interface, never on SQLite or the filesystem layout.
 class IArtifactRepository {
-public:
+   public:
     virtual ~IArtifactRepository() = default;
 
     virtual edge_sync::base::Result<void> store(const Manifest& manifest) = 0;

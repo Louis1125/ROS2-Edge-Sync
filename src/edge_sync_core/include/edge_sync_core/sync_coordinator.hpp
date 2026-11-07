@@ -13,7 +13,7 @@ namespace edge_sync::core {
 // concrete implementations (connection adapter + storage). This is the single
 // entry point that the ROS 2 adapter and the HTTP backend will both call.
 class SyncCoordinator {
-public:
+   public:
     SyncCoordinator(IRemotePeer& peers, IArtifactRepository& local_repository);
 
     // Fetch the remote manifest and compute which files must be fetched.
@@ -22,7 +22,7 @@ public:
     edge_sync::base::Result<SyncPlan> prepare(const edge_sync::base::RobotId& source_robot,
                                               const edge_sync::base::ArtifactId& artifact_id);
 
-private:
+   private:
     IRemotePeer& peers_;
     IArtifactRepository& local_repository_;
 };

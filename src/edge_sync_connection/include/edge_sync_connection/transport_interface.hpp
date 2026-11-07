@@ -26,7 +26,7 @@ struct TransportCallbacks {
 // Transport-agnostic interface implemented by concrete transports (Asio TCP,
 // and later HTTP/P2P). Upper layers never open sockets directly.
 class ITransport {
-public:
+   public:
     virtual ~ITransport() = default;
 
     // Begin listening on `listen_endpoint`; accepted connections fire
@@ -42,9 +42,11 @@ public:
     virtual void close(ConnectionId id) = 0;
     virtual void stop() = 0;
 
-    void set_callbacks(TransportCallbacks callbacks) { callbacks_ = std::move(callbacks); }
+    void set_callbacks(TransportCallbacks callbacks) {
+        callbacks_ = std::move(callbacks);
+    }
 
-protected:
+   protected:
     TransportCallbacks callbacks_;
 };
 

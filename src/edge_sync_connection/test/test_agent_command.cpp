@@ -7,10 +7,9 @@
 #include <string>
 #include <thread>
 
+#include "capturing_logger.hpp"
 #include "edge_sync_connection/connection_manager.hpp"
 #include "edge_sync_connection/tcp_transport.hpp"
-
-#include "capturing_logger.hpp"
 
 using namespace edge_sync::connection;
 using edge_sync::test_support::CapturingLogger;
@@ -37,12 +36,13 @@ TEST(AgentCommandTest, DispatchAndStatusRoundTrip) {
     auto cp = std::make_unique<ConnectionManager>(std::make_unique<TcpTransport>(), log);
     cp->set_local_identity("control-plane");
     cp->set_shared_secret("fleet-secret");
-    cp->set_application_message_handler([&](const Peer&, const edge_sync::protocol::MessageEnvelope& env) {
-        if (env.has_sync_status_report()) {
-            std::lock_guard lk(mu);
-            reported_status = env.sync_status_report().status();
-        }
-    });
+    cp->set_application_message_handler(
+        [&](const Peer&, const edge_sync::protocol::MessageEnvelope& env) {
+            if (env.has_sync_status_report()) {
+                std::lock_guard lk(mu);
+                reported_status = env.sync_status_report().status();
+            }
+        });
     ASSERT_TRUE(cp->start(kControlPlane).ok());
 
     std::string received_command_id;
@@ -50,7 +50,8 @@ TEST(AgentCommandTest, DispatchAndStatusRoundTrip) {
     auto robot = std::make_unique<ConnectionManager>(std::make_unique<TcpTransport>(), log);
     robot->set_local_identity("robot-a");
     robot->set_shared_secret("fleet-secret");
-    robot->set_application_message_handler([&](const Peer& peer, const edge_sync::protocol::MessageEnvelope& env) {
+    robot->set_application_message_handler([&](const Peer& peer,
+                                               const edge_sync::protocol::MessageEnvelope& env) {
         if (env.has_sync_command()) {
             received_command_id = env.sync_command().command_id();
             received_artifact = env.sync_command().artifact_id();
@@ -73,7 +74,10 @@ TEST(AgentCommandTest, DispatchAndStatusRoundTrip) {
     cmd.mutable_sync_command()->set_artifact_id("map-1");
     cp->send("robot-a", cmd);
 
-    wait_for([&] { std::lock_guard lk(mu); return !reported_status.empty(); });
+    wait_for([&] {
+        std::lock_guard lk(mu);
+        return !reported_status.empty();
+    });
     EXPECT_EQ(received_command_id, "cmd-1");
     EXPECT_EQ(received_artifact, "map-1");
     {

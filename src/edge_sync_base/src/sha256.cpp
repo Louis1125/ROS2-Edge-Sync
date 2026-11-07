@@ -18,7 +18,9 @@ constexpr std::array<std::uint32_t, 64> kRound = {
     0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
 
-std::uint32_t rotr(std::uint32_t x, std::uint32_t n) { return (x >> n) | (x << (32 - n)); }
+std::uint32_t rotr(std::uint32_t x, std::uint32_t n) {
+    return (x >> n) | (x << (32 - n));
+}
 
 std::string hex(const std::uint8_t* data, std::size_t n) {
     static const char* digits = "0123456789abcdef";
@@ -32,8 +34,9 @@ std::string hex(const std::uint8_t* data, std::size_t n) {
 
 }  // namespace
 
-Sha256::Sha256() : h_{0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-                       0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19} {}
+Sha256::Sha256()
+    : h_{0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+         0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19} {}
 
 void Sha256::transform_block(const std::uint8_t* block) {
     std::uint32_t w[64];
@@ -58,10 +61,23 @@ void Sha256::transform_block(const std::uint8_t* block) {
         const std::uint32_t s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
         const std::uint32_t maj = (a & b) ^ (a & c) ^ (b & c);
         const std::uint32_t t2 = s0 + maj;
-        hh = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
+        hh = g;
+        g = f;
+        f = e;
+        e = d + t1;
+        d = c;
+        c = b;
+        b = a;
+        a = t1 + t2;
     }
-    h_[0] += a; h_[1] += b; h_[2] += c; h_[3] += d;
-    h_[4] += e; h_[5] += f; h_[6] += g; h_[7] += hh;
+    h_[0] += a;
+    h_[1] += b;
+    h_[2] += c;
+    h_[3] += d;
+    h_[4] += e;
+    h_[5] += f;
+    h_[6] += g;
+    h_[7] += hh;
 }
 
 void Sha256::update(const std::uint8_t* data, std::size_t size) {
@@ -121,7 +137,9 @@ Hash sha256_hex(const std::uint8_t* data, std::size_t size) {
     return h.final_hex();
 }
 
-Hash sha256_hex(const ByteBuffer& data) { return sha256_hex(data.data(), data.size()); }
+Hash sha256_hex(const ByteBuffer& data) {
+    return sha256_hex(data.data(), data.size());
+}
 
 Hash sha256_hex(const std::string& data) {
     return sha256_hex(reinterpret_cast<const std::uint8_t*>(data.data()), data.size());
@@ -134,7 +152,8 @@ Hash sha256_hex_file(const std::string& path) {
     while (in) {
         in.read(reinterpret_cast<char*>(buf.data()), buf.size());
         const auto n = in.gcount();
-        if (n > 0) h.update(buf.data(), static_cast<std::size_t>(n));
+        if (n > 0)
+            h.update(buf.data(), static_cast<std::size_t>(n));
     }
     return h.final_hex();
 }

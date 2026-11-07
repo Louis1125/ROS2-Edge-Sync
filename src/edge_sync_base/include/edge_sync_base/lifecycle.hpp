@@ -9,15 +9,17 @@ namespace edge_sync::base {
 enum class LifecycleState { Inactive, Active, Shutdown };
 
 class Lifecycle {
-public:
+   public:
     virtual ~Lifecycle() = default;
 
     virtual Result<void> start() = 0;
     virtual Result<void> stop() = 0;
 
-    [[nodiscard]] LifecycleState state() const noexcept { return state_; }
+    [[nodiscard]] LifecycleState state() const noexcept {
+        return state_;
+    }
 
-protected:
+   protected:
     LifecycleState state_{LifecycleState::Inactive};
 };
 

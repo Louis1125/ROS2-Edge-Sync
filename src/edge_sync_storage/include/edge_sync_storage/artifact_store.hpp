@@ -16,7 +16,7 @@ namespace edge_sync::storage {
 // then atomically renames the staged file into place. Records the active
 // version in SQLite. An artifact is never visible as active until commit().
 class ArtifactStore final : public edge_sync::core::IArtifactStore {
-public:
+   public:
     ArtifactStore(std::string root, ObjectStore& objects, SqliteRepository& sqlite);
 
     edge_sync::base::Result<void> initialize();
@@ -29,7 +29,7 @@ public:
     edge_sync::base::Result<std::optional<edge_sync::base::Version>> active_version(
         const edge_sync::base::ArtifactId& id) override;
 
-private:
+   private:
     [[nodiscard]] std::string staging_path() const;
     [[nodiscard]] std::string active_path(const edge_sync::base::ArtifactId& id) const;
     void reset_staging(const edge_sync::base::ArtifactId& id, const edge_sync::base::Version& v);

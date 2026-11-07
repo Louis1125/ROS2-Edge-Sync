@@ -14,7 +14,7 @@ namespace edge_sync::control_plane {
 
 // Thin libpq wrapper. Runs schema migrations on connect.
 class Database {
-public:
+   public:
     explicit Database(std::string connection_info);
 
     edge_sync::base::Result<void> connect();
@@ -52,7 +52,7 @@ public:
     edge_sync::base::Result<void> upsert_agent_session(const std::string& robot_id);
     edge_sync::base::Result<void> touch_robot(const std::string& robot_id);
 
-private:
+   private:
     edge_sync::base::Result<void> execute(const std::string& sql);
 
     std::string connection_info_;

@@ -12,7 +12,7 @@ namespace edge_sync::core {
 // chunks must be fetched. Chunk comparison is by content hash, so duplicate
 // content already present locally is never re-transferred.
 class SyncPlanner {
-public:
+   public:
     edge_sync::base::Result<SyncPlan> plan(const std::optional<Manifest>& local,
                                            const Manifest& remote);
 };

@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 
+#include "capturing_logger.hpp"
 #include "edge_sync_connection/connection_manager.hpp"
 #include "edge_sync_connection/sync_peer_adapter.hpp"
 #include "edge_sync_connection/tcp_transport.hpp"
@@ -15,8 +16,6 @@
 #include "edge_sync_storage/artifact_repository.hpp"
 #include "edge_sync_storage/object_store.hpp"
 #include "edge_sync_storage/sqlite_repository.hpp"
-
-#include "capturing_logger.hpp"
 
 using namespace edge_sync;
 using namespace edge_sync::connection;
@@ -43,7 +42,7 @@ void wait_for(const std::function<bool()>& predicate, int attempts = 100) {
 }  // namespace
 
 class CollectingReceiver final : public IChunkReceiver {
-public:
+   public:
     edge_sync::base::Result<void> on_chunk(std::uint64_t index, base::ByteBuffer data) override {
         received_[index] = std::move(data);
         return {};

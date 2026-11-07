@@ -13,7 +13,7 @@ namespace edge_sync::base {
 // accessed through typed getters. This avoids a YAML dependency while keeping
 // human-editable config files.
 class Config {
-public:
+   public:
     static Result<Config> load_file(const std::string& path);
 
     [[nodiscard]] bool has(const std::string& key) const noexcept;
@@ -23,7 +23,7 @@ public:
     [[nodiscard]] int get_int(const std::string& key, int fallback = 0) const;
     [[nodiscard]] bool get_bool(const std::string& key, bool fallback = false) const;
 
-private:
+   private:
     std::unordered_map<std::string, std::string> values_;
 };
 

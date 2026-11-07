@@ -9,9 +9,9 @@ edge_sync::base::Result<void> ArtifactRepository::store(const edge_sync::core::M
     for (const auto& chunk : manifest.chunks) {
         const auto ok = objects_.exists(chunk.hash);
         if (!ok.ok() || !ok.value()) {
-            return edge_sync::base::Error{edge_sync::base::ErrorCode::IntegrityFailure,
-                                          "missing object for chunk " +
-                                              std::to_string(chunk.index)};
+            return edge_sync::base::Error{
+                edge_sync::base::ErrorCode::IntegrityFailure,
+                "missing object for chunk " + std::to_string(chunk.index)};
         }
     }
     return sqlite_.store_manifest(manifest);

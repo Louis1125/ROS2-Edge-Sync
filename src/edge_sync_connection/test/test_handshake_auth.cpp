@@ -5,10 +5,9 @@
 #include <memory>
 #include <thread>
 
+#include "capturing_logger.hpp"
 #include "edge_sync_connection/connection_manager.hpp"
 #include "edge_sync_connection/tcp_transport.hpp"
-
-#include "capturing_logger.hpp"
 
 using edge_sync::connection::ConnectionManager;
 using edge_sync::connection::Endpoint;
@@ -38,7 +37,9 @@ TEST(HandshakeAuthTest, CorrectSecretConnects) {
     ASSERT_TRUE(client->start(Endpoint{"127.0.0.1", 22444}).ok());
     ASSERT_TRUE(client->connect_peer(kServer).ok());
 
-    wait_for([&] { return server->is_connected("robot-client") && client->is_connected("robot-server"); });
+    wait_for([&] {
+        return server->is_connected("robot-client") && client->is_connected("robot-server");
+    });
     EXPECT_TRUE(server->is_connected("robot-client"));
     EXPECT_TRUE(client->is_connected("robot-server"));
 

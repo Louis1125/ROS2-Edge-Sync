@@ -4,10 +4,9 @@
 #include <memory>
 #include <thread>
 
+#include "capturing_logger.hpp"
 #include "edge_sync_connection/connection_manager.hpp"
 #include "edge_sync_connection/tcp_transport.hpp"
-
-#include "capturing_logger.hpp"
 
 using edge_sync::base::LogLevel;
 using edge_sync::connection::ConnectionManager;
@@ -30,19 +29,19 @@ TEST(HandshakeTest, TwoManagersCompleteHandshakeAndSession) {
     CapturingLogger server_log;
     CapturingLogger client_log;
 
-    auto server = std::make_unique<ConnectionManager>(
-        std::make_unique<TcpTransport>(), server_log);
+    auto server = std::make_unique<ConnectionManager>(std::make_unique<TcpTransport>(), server_log);
     server->set_local_identity("robot-server");
     ASSERT_TRUE(server->start(kServer).ok());
 
-    auto client = std::make_unique<ConnectionManager>(
-        std::make_unique<TcpTransport>(), client_log);
+    auto client = std::make_unique<ConnectionManager>(std::make_unique<TcpTransport>(), client_log);
     client->set_local_identity("robot-client");
     ASSERT_TRUE(client->start(kClient).ok());
 
     ASSERT_TRUE(client->connect_peer(kServer).ok());
 
-    wait_for([&] { return server->is_connected("robot-client") && client->is_connected("robot-server"); });
+    wait_for([&] {
+        return server->is_connected("robot-client") && client->is_connected("robot-server");
+    });
     ASSERT_TRUE(server->is_connected("robot-client"));
     ASSERT_TRUE(client->is_connected("robot-server"));
 

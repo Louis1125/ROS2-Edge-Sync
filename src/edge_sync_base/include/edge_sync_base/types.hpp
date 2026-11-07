@@ -8,7 +8,7 @@ namespace edge_sync::base {
 
 using RobotId = std::string;
 using ArtifactId = std::string;
-using Hash = std::string;                     // hex-encoded digest
+using Hash = std::string;  // hex-encoded digest
 using ByteBuffer = std::vector<std::uint8_t>;
 
 struct Version {

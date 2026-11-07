@@ -16,13 +16,13 @@ namespace edge_sync::control_plane {
 // agent session registry, and durably dispatches sync commands from the
 // transactional outbox. Delivery and execution states are tracked separately.
 class AgentGateway {
-public:
+   public:
     AgentGateway(Database& db, edge_sync::base::Logger& logger);
 
     edge_sync::base::Result<void> start(std::uint16_t port, const std::string& fleet_secret);
     void stop();
 
-private:
+   private:
     void dispatcher_loop(std::stop_token stop);
     void on_peer_connected(const std::string& robot_id);
     void on_peer_disconnected(const std::string& robot_id);

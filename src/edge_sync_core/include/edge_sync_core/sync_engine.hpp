@@ -14,14 +14,14 @@ namespace edge_sync::core {
 // verification, then atomically activate. Both the ROS 2 action and the HTTP
 // backend invoke this same service.
 class SyncEngine {
-public:
+   public:
     SyncEngine(IRemotePeer& peers, IArtifactRepository& repository, ITransfer& transfer,
                IArtifactStore& store);
 
-    edge_sync::base::Result<SyncOutcome> synchronize(const edge_sync::base::RobotId& source,
-                                                     const edge_sync::base::ArtifactId& artifact_id);
+    edge_sync::base::Result<SyncOutcome> synchronize(
+        const edge_sync::base::RobotId& source, const edge_sync::base::ArtifactId& artifact_id);
 
-private:
+   private:
     IRemotePeer& peers_;
     IArtifactRepository& repository_;
     ITransfer& transfer_;

@@ -33,19 +33,22 @@ CREATE TABLE IF NOT EXISTS active_versions (
 )SQL";
 
 edge_sync::base::Error sql_error(sqlite3* db, const char* context) {
-    return edge_sync::base::Error{edge_sync::base::ErrorCode::StorageFailure,
-                                  std::string(context) + ": " +
-                                      (db ? sqlite3_errmsg(db) : "unknown error")};
+    return edge_sync::base::Error{
+        edge_sync::base::ErrorCode::StorageFailure,
+        std::string(context) + ": " + (db ? sqlite3_errmsg(db) : "unknown error")};
 }
 
 }  // namespace
 
 SqliteRepository::SqliteRepository(std::string path) : path_(std::move(path)) {}
 
-SqliteRepository::~SqliteRepository() { close(); }
+SqliteRepository::~SqliteRepository() {
+    close();
+}
 
 edge_sync::base::Result<void> SqliteRepository::open() {
-    if (db_) return {};
+    if (db_)
+        return {};
 
     std::error_code ec;
     std::filesystem::create_directories(std::filesystem::path(path_).parent_path(), ec);
@@ -72,7 +75,8 @@ edge_sync::base::Result<void> SqliteRepository::open() {
 }
 
 edge_sync::base::Result<void> SqliteRepository::close() {
-    if (!db_) return {};
+    if (!db_)
+        return {};
     sqlite3_close(db_);
     db_ = nullptr;
     return {};
@@ -111,8 +115,9 @@ edge_sync::base::Result<void> SqliteRepository::store_manifest(
 
     for (const auto& c : manifest.chunks) {
         stmt = nullptr;
-        sql = "INSERT INTO manifest_chunks(artifact_id, chunk_index, chunk_offset, chunk_size, "
-              "chunk_hash) VALUES(?,?,?,?,?)";
+        sql =
+            "INSERT INTO manifest_chunks(artifact_id, chunk_index, chunk_offset, chunk_size, "
+            "chunk_hash) VALUES(?,?,?,?,?)";
         sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
         sqlite3_bind_text(stmt, 1, manifest.artifact_id.c_str(), -1, SQLITE_TRANSIENT);
         sqlite3_bind_int64(stmt, 2, static_cast<sqlite3_int64>(c.index));
@@ -151,13 +156,13 @@ edge_sync::base::Result<edge_sync::core::Manifest> SqliteRepository::load_manife
     manifest.schema_version = static_cast<std::uint32_t>(sqlite3_column_int(stmt, 3));
     manifest.total_size = static_cast<std::uint64_t>(sqlite3_column_int64(stmt, 4));
     manifest.chunk_size = static_cast<std::uint32_t>(sqlite3_column_int(stmt, 5));
-    manifest.artifact_hash =
-        reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6));
+    manifest.artifact_hash = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6));
     sqlite3_finalize(stmt);
 
     stmt = nullptr;
-    sql = "SELECT chunk_index, chunk_offset, chunk_size, chunk_hash FROM manifest_chunks "
-          "WHERE artifact_id = ? ORDER BY chunk_index";
+    sql =
+        "SELECT chunk_index, chunk_offset, chunk_size, chunk_hash FROM manifest_chunks "
+        "WHERE artifact_id = ? ORDER BY chunk_index";
     if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         return sql_error(db_, "prepare load manifest chunks");
     }

@@ -10,7 +10,7 @@ namespace edge_sync::core {
 // connection layer over the ConnectionManager. Core depends only on this
 // interface, never on a concrete transport.
 class IRemotePeer {
-public:
+   public:
     virtual ~IRemotePeer() = default;
 
     virtual edge_sync::base::Result<Manifest> request_manifest(

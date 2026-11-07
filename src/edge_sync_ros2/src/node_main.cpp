@@ -1,5 +1,4 @@
 #include <memory>
-
 #include <rclcpp/rclcpp.hpp>
 
 #include "edge_sync_ros2/edge_sync_node.hpp"

@@ -26,7 +26,8 @@ edge_sync::base::Result<edge_sync::base::Hash> ObjectStore::put(
     const std::string path = path_for(hash);
 
     std::error_code ec;
-    if (fs::exists(path, ec)) return hash;
+    if (fs::exists(path, ec))
+        return hash;
 
     fs::create_directories(fs::path(path).parent_path(), ec);
     if (ec) {

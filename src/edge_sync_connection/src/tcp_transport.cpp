@@ -1,18 +1,20 @@
 #include "edge_sync_connection/tcp_transport.hpp"
 
-#include <future>
-#include <utility>
-
 #include <boost/asio/connect.hpp>
 #include <boost/asio/write.hpp>
+#include <future>
+#include <utility>
 
 namespace edge_sync::connection {
 namespace asio = boost::asio;
 using tcp = asio::ip::tcp;
 
-TcpTransport::TcpTransport(TimeoutConfig timeouts) : timeouts_(timeouts), work_guard_(boost::asio::make_work_guard(io_)) {}
+TcpTransport::TcpTransport(TimeoutConfig timeouts)
+    : timeouts_(timeouts), work_guard_(boost::asio::make_work_guard(io_)) {}
 
-TcpTransport::~TcpTransport() { stop(); }
+TcpTransport::~TcpTransport() {
+    stop();
+}
 
 void TcpTransport::ensure_io_thread() {
     if (!io_thread_.joinable()) {
@@ -30,9 +32,12 @@ edge_sync::base::Result<void> TcpTransport::start(const Endpoint& listen_endpoin
     acceptor_ = std::make_unique<tcp::acceptor>(io_);
     boost::system::error_code ec;
     acceptor_->open(ep.protocol(), ec);
-    if (!ec) acceptor_->set_option(tcp::acceptor::reuse_address(true), ec);
-    if (!ec) acceptor_->bind(ep, ec);
-    if (!ec) acceptor_->listen(asio::socket_base::max_listen_connections, ec);
+    if (!ec)
+        acceptor_->set_option(tcp::acceptor::reuse_address(true), ec);
+    if (!ec)
+        acceptor_->bind(ep, ec);
+    if (!ec)
+        acceptor_->listen(asio::socket_base::max_listen_connections, ec);
     if (ec) {
         acceptor_.reset();
         return edge_sync::base::Error{edge_sync::base::ErrorCode::ConnectionFailed, ec.message()};
@@ -44,9 +49,11 @@ edge_sync::base::Result<void> TcpTransport::start(const Endpoint& listen_endpoin
 }
 
 void TcpTransport::accept_loop() {
-    if (stopped_) return;
+    if (stopped_)
+        return;
     acceptor_->async_accept([this](const boost::system::error_code& ec, tcp::socket socket) {
-        if (stopped_ || ec) return;
+        if (stopped_ || ec)
+            return;
 
         auto conn = std::make_shared<Conn>();
         conn->socket = std::make_shared<tcp::socket>(std::move(socket));
@@ -57,7 +64,8 @@ void TcpTransport::accept_loop() {
         const auto remote = conn->socket->remote_endpoint(remote_ec);
         const Endpoint endpoint{remote.address().to_string(), remote.port()};
 
-        if (callbacks_.on_accepted) callbacks_.on_accepted(id, endpoint);
+        if (callbacks_.on_accepted)
+            callbacks_.on_accepted(id, endpoint);
         start_read(id, conn);
         accept_loop();
     });
@@ -78,8 +86,7 @@ edge_sync::base::Result<ConnectionId> TcpTransport::connect(const Endpoint& endp
 
     tcp::resolver resolver(io_);
     boost::system::error_code ec;
-    const auto results =
-        resolver.resolve(endpoint.address, std::to_string(endpoint.port), ec);
+    const auto results = resolver.resolve(endpoint.address, std::to_string(endpoint.port), ec);
     if (ec) {
         conns_.erase(id);
         return edge_sync::base::Error{edge_sync::base::ErrorCode::ConnectionFailed, ec.message()};
@@ -87,17 +94,15 @@ edge_sync::base::Result<ConnectionId> TcpTransport::connect(const Endpoint& endp
 
     auto prom = std::make_shared<std::promise<boost::system::error_code>>();
     auto fut = prom->get_future();
-    asio::async_connect(*socket, results,
-                        [prom](const boost::system::error_code& e, const tcp::endpoint&) {
-                            prom->set_value(e);
-                        });
+    asio::async_connect(
+        *socket, results,
+        [prom](const boost::system::error_code& e, const tcp::endpoint&) { prom->set_value(e); });
 
     if (fut.wait_for(timeouts_.connect) != std::future_status::ready) {
         boost::system::error_code ignore;
         socket->close(ignore);
         conns_.erase(id);
-        return edge_sync::base::Error{edge_sync::base::ErrorCode::Timeout,
-                                      "connect timed out"};
+        return edge_sync::base::Error{edge_sync::base::ErrorCode::Timeout, "connect timed out"};
     }
 
     const boost::system::error_code result = fut.get();
@@ -118,13 +123,15 @@ void TcpTransport::start_read(ConnectionId id, const std::shared_ptr<Conn>& conn
         [this, id, conn, buf](const boost::system::error_code& ec, std::size_t size) {
             if (ec) {
                 conns_.erase(id);
-                if (callbacks_.on_disconnected) callbacks_.on_disconnected(id);
+                if (callbacks_.on_disconnected)
+                    callbacks_.on_disconnected(id);
                 return;
             }
             std::vector<ByteBuffer> frames;
             conn->decoder.feed(buf->data(), size, frames);
             for (auto& frame : frames) {
-                if (callbacks_.on_message) callbacks_.on_message(id, std::move(frame));
+                if (callbacks_.on_message)
+                    callbacks_.on_message(id, std::move(frame));
             }
             start_read(id, conn);
         });
@@ -132,7 +139,8 @@ void TcpTransport::start_read(ConnectionId id, const std::shared_ptr<Conn>& conn
 
 void TcpTransport::send(ConnectionId id, const ByteBuffer& data) {
     const auto it = conns_.find(id);
-    if (it == conns_.end()) return;
+    if (it == conns_.end())
+        return;
 
     auto framed = std::make_shared<ByteBuffer>(encode_frame(data));
     asio::async_write(*it->second->socket, asio::buffer(*framed),
@@ -143,7 +151,8 @@ void TcpTransport::send(ConnectionId id, const ByteBuffer& data) {
 
 void TcpTransport::close(ConnectionId id) {
     const auto it = conns_.find(id);
-    if (it == conns_.end()) return;
+    if (it == conns_.end())
+        return;
     boost::system::error_code ec;
     it->second->socket->shutdown(tcp::socket::shutdown_both, ec);
     it->second->socket->close(ec);
@@ -151,7 +160,8 @@ void TcpTransport::close(ConnectionId id) {
 }
 
 void TcpTransport::stop() {
-    if (stopped_.exchange(true)) return;
+    if (stopped_.exchange(true))
+        return;
 
     if (acceptor_) {
         boost::system::error_code ec;
@@ -160,11 +170,13 @@ void TcpTransport::stop() {
     }
     work_guard_.reset();
     io_.stop();
-    if (io_thread_.joinable()) io_thread_.join();
+    if (io_thread_.joinable())
+        io_thread_.join();
 
     for (auto& [id, conn] : conns_) {
         boost::system::error_code ec;
-        if (conn->socket->is_open()) conn->socket->close(ec);
+        if (conn->socket->is_open())
+            conn->socket->close(ec);
     }
     conns_.clear();
 }

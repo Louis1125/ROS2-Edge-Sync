@@ -1,10 +1,10 @@
 #include "edge_sync_connection/connection_manager.hpp"
 
-#include "edge_sync_base/hmac.hpp"
-
 #include <condition_variable>
 #include <mutex>
 #include <utility>
+
+#include "edge_sync_base/hmac.hpp"
 
 namespace edge_sync::connection {
 namespace {
@@ -50,7 +50,8 @@ edge_sync::base::Result<void> ConnectionManager::start(const Endpoint& listen_en
 
 edge_sync::base::Result<void> ConnectionManager::connect_peer(const Endpoint& endpoint) {
     auto result = transport_->connect(endpoint);
-    if (!result) return result.error();
+    if (!result)
+        return result.error();
 
     const ConnectionId id = result.value();
     endpoints_[id] = endpoint;
@@ -69,8 +70,7 @@ edge_sync::base::Result<void> ConnectionManager::connect_peer(const Endpoint& en
     }
     send_envelope(id, env);
 
-    logger_.log(edge_sync::base::LogLevel::Info,
-                "connecting to " + endpoint_string(endpoint));
+    logger_.log(edge_sync::base::LogLevel::Info, "connecting to " + endpoint_string(endpoint));
     return {};
 }
 
@@ -103,8 +103,7 @@ edge_sync::base::Result<edge_sync::protocol::MessageEnvelope> ConnectionManager:
     if (future.wait_for(timeout) != std::future_status::ready) {
         std::lock_guard lk(pending_mu_);
         pending_.erase(request_id);
-        return edge_sync::base::Error{edge_sync::base::ErrorCode::Timeout,
-                                      "request timed out"};
+        return edge_sync::base::Error{edge_sync::base::ErrorCode::Timeout, "request timed out"};
     }
     return future.get();
 }
@@ -153,7 +152,8 @@ void ConnectionManager::on_message(ConnectionId id, ByteBuffer data) {
                     "dropping application message from non-connected peer");
         return;
     }
-    if (app_handler_) app_handler_(it->second, env);
+    if (app_handler_)
+        app_handler_(it->second, env);
 }
 
 void ConnectionManager::handle_handshake_request(ConnectionId id, const Endpoint&,
@@ -199,19 +199,20 @@ void ConnectionManager::handle_handshake_request(ConnectionId id, const Endpoint
     send_envelope(id, resp);
     logger_.log(edge_sync::base::LogLevel::Info,
                 "handshake complete (inbound) with '" + req.robot_id() + "'");
-    if (peer_connected_) peer_connected_(req.robot_id());
+    if (peer_connected_)
+        peer_connected_(req.robot_id());
 }
 
 void ConnectionManager::handle_handshake_response(ConnectionId id, const Endpoint&,
                                                   const edge_sync::protocol::MessageEnvelope& env) {
     const auto& resp = env.handshake_response();
     const auto it = peers_.find(id);
-    if (it == peers_.end()) return;
+    if (it == peers_.end())
+        return;
 
     if (!resp.accepted()) {
         it->second.state = ConnectionState::Failed;
-        logger_.log(edge_sync::base::LogLevel::Error,
-                    "handshake rejected: " + resp.reason());
+        logger_.log(edge_sync::base::LogLevel::Error, "handshake rejected: " + resp.reason());
         transport_->close(id);
         return;
     }
@@ -221,7 +222,8 @@ void ConnectionManager::handle_handshake_response(ConnectionId id, const Endpoin
     conn_by_robot_[resp.robot_id()] = id;
     logger_.log(edge_sync::base::LogLevel::Info,
                 "handshake complete (outbound) with '" + resp.robot_id() + "'");
-    if (peer_connected_) peer_connected_(resp.robot_id());
+    if (peer_connected_)
+        peer_connected_(resp.robot_id());
 }
 
 void ConnectionManager::on_disconnected(ConnectionId id) {
@@ -230,14 +232,17 @@ void ConnectionManager::on_disconnected(ConnectionId id) {
     const bool was_outbound = outbound_.count(id) && outbound_[id];
     const Endpoint endpoint = endpoints_[id];
 
-    if (!robot_id.empty()) conn_by_robot_.erase(robot_id);
+    if (!robot_id.empty())
+        conn_by_robot_.erase(robot_id);
     erase_connection(id);
-    if (peer_disconnected_ && !robot_id.empty()) peer_disconnected_(robot_id);
+    if (peer_disconnected_ && !robot_id.empty())
+        peer_disconnected_(robot_id);
 
     logger_.log(edge_sync::base::LogLevel::Warn,
                 "connection lost" + (robot_id.empty() ? "" : " with '" + robot_id + "'"));
 
-    if (was_outbound && !stopping_) schedule_reconnect(endpoint);
+    if (was_outbound && !stopping_)
+        schedule_reconnect(endpoint);
 }
 
 void ConnectionManager::schedule_reconnect(const Endpoint& endpoint) {
@@ -245,19 +250,21 @@ void ConnectionManager::schedule_reconnect(const Endpoint& endpoint) {
         auto delay = retry_.base_delay;
         for (std::uint32_t attempt = 1; attempt <= retry_.max_attempts; ++attempt) {
             sleep_for(delay, stop);
-            if (stop.stop_requested() || stopping_) return;
+            if (stop.stop_requested() || stopping_)
+                return;
 
-            logger_.log(edge_sync::base::LogLevel::Info,
-                        "reconnect attempt " + std::to_string(attempt) + " to " +
-                            endpoint_string(endpoint));
+            logger_.log(edge_sync::base::LogLevel::Info, "reconnect attempt " +
+                                                             std::to_string(attempt) + " to " +
+                                                             endpoint_string(endpoint));
             if (connect_peer(endpoint).ok()) {
                 logger_.log(edge_sync::base::LogLevel::Info,
                             "reconnected to " + endpoint_string(endpoint));
                 return;
             }
-            delay = std::chrono::duration_cast<std::chrono::milliseconds>(
-                delay * retry_.backoff_factor);
-            if (delay > retry_.max_delay) delay = retry_.max_delay;
+            delay = std::chrono::duration_cast<std::chrono::milliseconds>(delay *
+                                                                          retry_.backoff_factor);
+            if (delay > retry_.max_delay)
+                delay = retry_.max_delay;
         }
         logger_.log(edge_sync::base::LogLevel::Error,
                     "gave up reconnecting to " + endpoint_string(endpoint));
@@ -327,7 +334,8 @@ bool ConnectionManager::is_connected(const std::string& robot_id) const {
 
 std::optional<ConnectionId> ConnectionManager::connection_for(const std::string& robot_id) const {
     const auto it = conn_by_robot_.find(robot_id);
-    if (it == conn_by_robot_.end()) return std::nullopt;
+    if (it == conn_by_robot_.end())
+        return std::nullopt;
     return it->second;
 }
 
@@ -338,11 +346,13 @@ void ConnectionManager::erase_connection(ConnectionId id) {
 }
 
 void ConnectionManager::stop() {
-    if (stopping_.exchange(true)) return;
+    if (stopping_.exchange(true))
+        return;
     for (auto& t : reconnect_threads_) t.request_stop();
     transport_->stop();
     for (auto& t : reconnect_threads_) {
-        if (t.joinable()) t.join();
+        if (t.joinable())
+            t.join();
     }
     reconnect_threads_.clear();
     {

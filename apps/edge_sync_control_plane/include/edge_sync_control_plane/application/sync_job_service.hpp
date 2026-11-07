@@ -14,7 +14,7 @@ namespace edge_sync::control_plane {
 // Application service for sync jobs. All interfaces (REST, CLI, SDK, MCP) call
 // this service rather than touching the database directly.
 class SyncJobService {
-public:
+   public:
     explicit SyncJobService(Database& db) : db_(db) {}
 
     edge_sync::base::Result<SyncJob> create(const std::string& source, const std::string& target,
@@ -33,15 +33,19 @@ public:
         return job;
     }
 
-    edge_sync::base::Result<std::vector<SyncJob>> list() { return db_.list_sync_jobs(); }
-    edge_sync::base::Result<SyncJob> get(const std::string& id) { return db_.get_sync_job(id); }
+    edge_sync::base::Result<std::vector<SyncJob>> list() {
+        return db_.list_sync_jobs();
+    }
+    edge_sync::base::Result<SyncJob> get(const std::string& id) {
+        return db_.get_sync_job(id);
+    }
 
     edge_sync::base::Result<void> mark(const std::string& id, const std::string& status,
                                        const std::string& error = "") {
         return db_.update_sync_job_status(id, status, error);
     }
 
-private:
+   private:
     static std::string make_job_id() {
         const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                             std::chrono::system_clock::now().time_since_epoch())

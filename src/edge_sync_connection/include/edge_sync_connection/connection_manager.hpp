@@ -35,7 +35,7 @@ using ApplicationMessageHandler =
 // start/connect_peer/request/stop may be called from the owner thread. The
 // pending-request map is guarded by its own mutex.
 class ConnectionManager {
-public:
+   public:
     ConnectionManager(std::unique_ptr<ITransport> transport, edge_sync::base::Logger& logger,
                       RetryPolicy retry = {}, TimeoutConfig timeouts = {});
 
@@ -69,7 +69,7 @@ public:
 
     [[nodiscard]] bool is_connected(const std::string& robot_id) const;
 
-private:
+   private:
     void on_accepted(ConnectionId id, const Endpoint& endpoint);
     void on_message(ConnectionId id, ByteBuffer data);
     void on_disconnected(ConnectionId id);
@@ -91,19 +91,19 @@ private:
     std::string local_public_key_id_;
     std::string shared_secret_;
 
-    std::map<ConnectionId, Peer> peers_;              // conn -> peer (after handshake)
-    std::map<ConnectionId, Endpoint> endpoints_;      // conn -> remote endpoint
-    std::map<ConnectionId, bool> outbound_;           // conn -> we initiated it
+    std::map<ConnectionId, Peer> peers_;          // conn -> peer (after handshake)
+    std::map<ConnectionId, Endpoint> endpoints_;  // conn -> remote endpoint
+    std::map<ConnectionId, bool> outbound_;       // conn -> we initiated it
     std::map<std::string, ConnectionId> conn_by_robot_;
 
-    std::map<Session::Id, std::string> sessions_;     // session -> robot id
+    std::map<Session::Id, std::string> sessions_;  // session -> robot id
     Session::Id next_session_id_{1};
 
     std::uint64_t next_request_id_{1};
     std::mutex pending_mu_;
-    std::map<std::string,
-             std::shared_ptr<std::promise<
-                 edge_sync::base::Result<edge_sync::protocol::MessageEnvelope>>>> pending_;
+    std::map<std::string, std::shared_ptr<std::promise<
+                              edge_sync::base::Result<edge_sync::protocol::MessageEnvelope>>>>
+        pending_;
 
     RetryPolicy retry_;
     TimeoutConfig timeouts_;

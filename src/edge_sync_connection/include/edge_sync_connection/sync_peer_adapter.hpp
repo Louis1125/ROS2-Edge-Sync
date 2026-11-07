@@ -24,7 +24,7 @@ namespace edge_sync::connection {
 // only copies bytes, and disk I/O happens on the caller/worker threads.
 class SyncPeerAdapter final : public edge_sync::core::IRemotePeer,
                               public edge_sync::core::ITransfer {
-public:
+   public:
     SyncPeerAdapter(ConnectionManager& connections,
                     edge_sync::core::IArtifactRepository& local_repository,
                     edge_sync::core::IChunkProvider& chunks);
@@ -34,16 +34,15 @@ public:
         const edge_sync::base::RobotId& robot_id,
         const edge_sync::base::ArtifactId& artifact_id) override;
 
-    edge_sync::base::Result<void> pull_chunks(
-        const edge_sync::base::RobotId& source, const edge_sync::base::ArtifactId& artifact_id,
-        const std::vector<std::uint64_t>& chunk_indices,
-        edge_sync::core::IChunkReceiver& receiver) override;
+    edge_sync::base::Result<void> pull_chunks(const edge_sync::base::RobotId& source,
+                                              const edge_sync::base::ArtifactId& artifact_id,
+                                              const std::vector<std::uint64_t>& chunk_indices,
+                                              edge_sync::core::IChunkReceiver& receiver) override;
 
-    void on_application_message(const Peer& peer,
-                                const edge_sync::protocol::MessageEnvelope& env);
+    void on_application_message(const Peer& peer, const edge_sync::protocol::MessageEnvelope& env);
     void stop();
 
-private:
+   private:
     struct PullContext {
         std::mutex mu;
         std::condition_variable cv;

@@ -28,30 +28,38 @@ using namespace edge_sync;
 
 namespace {
 std::atomic<bool> g_stop{false};
-void on_signal(int) { g_stop = true; }
+void on_signal(int) {
+    g_stop = true;
+}
 
 base::LogLevel parse_level(const std::string& s) {
-    if (s == "trace") return base::LogLevel::Trace;
-    if (s == "debug") return base::LogLevel::Debug;
-    if (s == "warn") return base::LogLevel::Warn;
-    if (s == "error") return base::LogLevel::Error;
+    if (s == "trace")
+        return base::LogLevel::Trace;
+    if (s == "debug")
+        return base::LogLevel::Debug;
+    if (s == "warn")
+        return base::LogLevel::Warn;
+    if (s == "error")
+        return base::LogLevel::Error;
     return base::LogLevel::Info;
 }
 
 std::vector<connection::Endpoint> parse_peers(const std::string& spec) {
     std::vector<connection::Endpoint> peers;
-    if (spec.empty()) return peers;
+    if (spec.empty())
+        return peers;
     std::size_t start = 0;
     while (start <= spec.size()) {
         const auto comma = spec.find(',', start);
-        const auto token = spec.substr(start, comma == std::string::npos ? std::string::npos
-                                                                         : comma - start);
+        const auto token =
+            spec.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
         const auto colon = token.rfind(':');
         if (colon != std::string::npos) {
             peers.push_back({token.substr(0, colon),
                              static_cast<std::uint16_t>(std::stoi(token.substr(colon + 1)))});
         }
-        if (comma == std::string::npos) break;
+        if (comma == std::string::npos)
+            break;
         start = comma + 1;
     }
     return peers;
@@ -62,7 +70,8 @@ int main(int argc, char** argv) {
     std::string config_path = "config/robot.yaml";
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--config" && i + 1 < argc) config_path = argv[++i];
+        if (arg == "--config" && i + 1 < argc)
+            config_path = argv[++i];
     }
 
     auto cfg = base::Config::load_file(config_path);
@@ -103,7 +112,8 @@ int main(int argc, char** argv) {
             const std::string file = argv[++i];
             std::string artifact_id = "artifact";
             for (int j = 1; j < argc; ++j) {
-                if (std::string(argv[j]) == "--artifact" && j + 1 < argc) artifact_id = argv[++j];
+                if (std::string(argv[j]) == "--artifact" && j + 1 < argc)
+                    artifact_id = argv[++j];
             }
             std::ifstream in(file, std::ios::binary);
             base::ByteBuffer data((std::istreambuf_iterator<char>(in)),
@@ -114,8 +124,9 @@ int main(int argc, char** argv) {
                 return 1;
             }
             for (const auto& c : manifest.value().chunks) {
-                base::ByteBuffer chunk(data.begin() + static_cast<std::ptrdiff_t>(c.offset),
-                                       data.begin() + static_cast<std::ptrdiff_t>(c.offset + c.size));
+                base::ByteBuffer chunk(
+                    data.begin() + static_cast<std::ptrdiff_t>(c.offset),
+                    data.begin() + static_cast<std::ptrdiff_t>(c.offset + c.size));
                 if (auto r = objects.put(chunk); !r) {
                     std::fprintf(stderr, "seed: %s\n", r.error().message.c_str());
                     return 1;
@@ -139,7 +150,8 @@ int main(int argc, char** argv) {
     auto peer_transport = std::make_unique<connection::TcpTransport>();
     connection::ConnectionManager peers(std::move(peer_transport), logger);
     peers.set_local_identity(robot_id);
-    if (!fleet_secret.empty()) peers.set_shared_secret(fleet_secret);
+    if (!fleet_secret.empty())
+        peers.set_shared_secret(fleet_secret);
     if (auto r = peers.start({listen, port}); !r) {
         logger.log(base::LogLevel::Error, "listen failed: " + r.error().message);
         return 1;
@@ -161,14 +173,17 @@ int main(int argc, char** argv) {
     const std::string cp_host = c.get_string("control_plane.host", "");
     std::jthread heartbeat_thread;
     if (!cp_host.empty()) {
-        const std::uint16_t cp_port = static_cast<std::uint16_t>(c.get_int("control_plane.port", 7443));
+        const std::uint16_t cp_port =
+            static_cast<std::uint16_t>(c.get_int("control_plane.port", 7443));
         control_plane = std::make_unique<connection::ConnectionManager>(
             std::make_unique<connection::TcpTransport>(), logger);
         control_plane->set_local_identity(robot_id);
-        if (!fleet_secret.empty()) control_plane->set_shared_secret(fleet_secret);
+        if (!fleet_secret.empty())
+            control_plane->set_shared_secret(fleet_secret);
         control_plane->set_application_message_handler(
             [&](const connection::Peer& cp, const protocol::MessageEnvelope& env) {
-                if (!env.has_sync_command()) return;
+                if (!env.has_sync_command())
+                    return;
                 const auto command_id = env.sync_command().command_id();
                 const auto source = env.sync_command().source_robot();
                 const auto artifact = env.sync_command().artifact_id();
@@ -176,7 +191,8 @@ int main(int argc, char** argv) {
                 // idempotency: acknowledge and skip already-executed commands
                 {
                     std::lock_guard lk(executed_mu);
-                    if (executed.count(command_id)) return;
+                    if (executed.count(command_id))
+                        return;
                 }
 
                 // acknowledge delivery
@@ -218,8 +234,7 @@ int main(int argc, char** argv) {
                     const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
                                          std::chrono::system_clock::now().time_since_epoch())
                                          .count();
-                    hb.mutable_heartbeat()->set_timestamp_ms(
-                        static_cast<std::uint64_t>(now));
+                    hb.mutable_heartbeat()->set_timestamp_ms(static_cast<std::uint64_t>(now));
                     control_plane->send("control-plane", hb);
                 }
             }
@@ -236,13 +251,15 @@ int main(int argc, char** argv) {
 
     logger.log(base::LogLevel::Info, "shutting down");
     for (auto& w : workers) {
-        if (w.joinable()) w.join();
+        if (w.joinable())
+            w.join();
     }
     if (heartbeat_thread.joinable()) {
         heartbeat_thread.request_stop();
         heartbeat_thread.join();
     }
-    if (control_plane) control_plane->stop();
+    if (control_plane)
+        control_plane->stop();
     peers.stop();
     sqlite.close();
     logger.log(base::LogLevel::Info, "bye");

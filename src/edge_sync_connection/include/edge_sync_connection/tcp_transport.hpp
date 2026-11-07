@@ -1,11 +1,10 @@
 #pragma once
 
 #include <atomic>
+#include <boost/asio.hpp>
 #include <map>
 #include <memory>
 #include <thread>
-
-#include <boost/asio.hpp>
 
 #include "edge_sync_connection/frame_codec.hpp"
 #include "edge_sync_connection/timeout_manager.hpp"
@@ -17,7 +16,7 @@ namespace edge_sync::connection {
 // serialized and ConnectionManager needs no internal locking). Messages are
 // length-prefixed (see FrameDecoder).
 class TcpTransport final : public ITransport {
-public:
+   public:
     explicit TcpTransport(TimeoutConfig timeouts = {});
     ~TcpTransport() override;
 
@@ -30,7 +29,7 @@ public:
     void close(ConnectionId id) override;
     void stop() override;
 
-private:
+   private:
     struct Conn {
         std::shared_ptr<boost::asio::ip::tcp::socket> socket;
         FrameDecoder decoder;

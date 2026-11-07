@@ -24,10 +24,10 @@ edge_sync::base::Result<Manifest> build_manifest(const edge_sync::base::Artifact
     std::uint64_t index = 0;
     for (std::size_t offset = 0; offset < data.size(); offset += chunk_size, ++index) {
         const std::size_t size = std::min<std::size_t>(chunk_size, data.size() - offset);
-        edge_sync::base::ByteBuffer chunk(data.begin() + static_cast<std::ptrdiff_t>(offset),
-                                          data.begin() + static_cast<std::ptrdiff_t>(offset + size));
-        manifest.chunks.push_back(ChunkDescriptor{index, offset,
-                                                  static_cast<std::uint32_t>(size),
+        edge_sync::base::ByteBuffer chunk(
+            data.begin() + static_cast<std::ptrdiff_t>(offset),
+            data.begin() + static_cast<std::ptrdiff_t>(offset + size));
+        manifest.chunks.push_back(ChunkDescriptor{index, offset, static_cast<std::uint32_t>(size),
                                                   edge_sync::base::sha256_hex(chunk)});
     }
     return manifest;

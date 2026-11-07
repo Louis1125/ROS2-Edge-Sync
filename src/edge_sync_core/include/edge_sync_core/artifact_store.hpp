@@ -12,7 +12,7 @@ namespace edge_sync::core {
 // keeps an artifact in a temporary area until its full hash is verified, so an
 // incomplete or corrupted artifact is never exposed as active.
 class IArtifactStore {
-public:
+   public:
     virtual ~IArtifactStore() = default;
 
     virtual edge_sync::base::Result<void> stage_chunk(const edge_sync::base::ArtifactId& id,

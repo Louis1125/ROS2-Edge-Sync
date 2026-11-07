@@ -10,7 +10,7 @@ namespace edge_sync::storage {
 // with the content-addressed object store. The runtime injects this concrete
 // implementation where core logic only sees the interface.
 class ArtifactRepository final : public edge_sync::core::IArtifactRepository {
-public:
+   public:
     ArtifactRepository(SqliteRepository& sqlite, ObjectStore& objects);
 
     edge_sync::base::Result<void> store(const edge_sync::core::Manifest& manifest) override;
@@ -18,7 +18,7 @@ public:
         const edge_sync::base::ArtifactId& artifact_id) override;
     edge_sync::base::Result<bool> exists(const edge_sync::base::ArtifactId& artifact_id) override;
 
-private:
+   private:
     SqliteRepository& sqlite_;
     ObjectStore& objects_;
 };

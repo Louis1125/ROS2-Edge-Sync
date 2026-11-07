@@ -10,7 +10,8 @@ namespace {
 
 std::string trim(const std::string& s) {
     const auto first = s.find_first_not_of(" \t\r\n");
-    if (first == std::string::npos) return {};
+    if (first == std::string::npos)
+        return {};
     const auto last = s.find_last_not_of(" \t\r\n");
     return s.substr(first, last - first + 1);
 }
@@ -31,7 +32,8 @@ Result<Config> Config::load_file(const std::string& path) {
     while (std::getline(in, line)) {
         ++line_no;
         const std::string trimmed = trim(line);
-        if (trimmed.empty() || trimmed[0] == '#') continue;
+        if (trimmed.empty() || trimmed[0] == '#')
+            continue;
 
         int indent = 0;
         while (indent < static_cast<int>(line.size()) && line[indent] == ' ') ++indent;
@@ -63,7 +65,9 @@ Result<Config> Config::load_file(const std::string& path) {
     return config;
 }
 
-bool Config::has(const std::string& key) const noexcept { return values_.count(key) > 0; }
+bool Config::has(const std::string& key) const noexcept {
+    return values_.count(key) > 0;
+}
 
 std::string Config::get_string(const std::string& key, const std::string& fallback) const {
     const auto it = values_.find(key);
@@ -72,13 +76,15 @@ std::string Config::get_string(const std::string& key, const std::string& fallba
 
 int Config::get_int(const std::string& key, int fallback) const {
     const auto it = values_.find(key);
-    if (it == values_.end()) return fallback;
+    if (it == values_.end())
+        return fallback;
     return std::strtol(it->second.c_str(), nullptr, 10);
 }
 
 bool Config::get_bool(const std::string& key, bool fallback) const {
     const auto it = values_.find(key);
-    if (it == values_.end()) return fallback;
+    if (it == values_.end())
+        return fallback;
     const auto& v = it->second;
     return v == "true" || v == "1" || v == "yes";
 }

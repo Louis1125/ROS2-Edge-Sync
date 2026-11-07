@@ -12,34 +12,52 @@ namespace edge_sync::base {
 // reading the wrong alternative is a programming error and throws std::bad_variant_access.
 template <typename T>
 class Result {
-public:
+   public:
     Result(T value) : storage_(std::move(value)) {}
     Result(Error error) : storage_(std::move(error)) {}
 
-    [[nodiscard]] bool ok() const noexcept { return std::holds_alternative<T>(storage_); }
-    [[nodiscard]] explicit operator bool() const noexcept { return ok(); }
+    [[nodiscard]] bool ok() const noexcept {
+        return std::holds_alternative<T>(storage_);
+    }
+    [[nodiscard]] explicit operator bool() const noexcept {
+        return ok();
+    }
 
-    [[nodiscard]] const T& value() const& { return std::get<T>(storage_); }
-    [[nodiscard]] T& value() & { return std::get<T>(storage_); }
-    [[nodiscard]] T&& value() && { return std::get<T>(std::move(storage_)); }
+    [[nodiscard]] const T& value() const& {
+        return std::get<T>(storage_);
+    }
+    [[nodiscard]] T& value() & {
+        return std::get<T>(storage_);
+    }
+    [[nodiscard]] T&& value() && {
+        return std::get<T>(std::move(storage_));
+    }
 
-    [[nodiscard]] const Error& error() const noexcept { return std::get<Error>(storage_); }
+    [[nodiscard]] const Error& error() const noexcept {
+        return std::get<Error>(storage_);
+    }
 
-private:
+   private:
     std::variant<T, Error> storage_;
 };
 
 template <>
 class Result<void> {
-public:
+   public:
     Result() = default;
     Result(Error error) : error_(std::move(error)) {}
 
-    [[nodiscard]] bool ok() const noexcept { return !error_.has_value(); }
-    [[nodiscard]] explicit operator bool() const noexcept { return ok(); }
-    [[nodiscard]] const Error& error() const& { return *error_; }
+    [[nodiscard]] bool ok() const noexcept {
+        return !error_.has_value();
+    }
+    [[nodiscard]] explicit operator bool() const noexcept {
+        return ok();
+    }
+    [[nodiscard]] const Error& error() const& {
+        return *error_;
+    }
 
-private:
+   private:
     std::optional<Error> error_;
 };
 

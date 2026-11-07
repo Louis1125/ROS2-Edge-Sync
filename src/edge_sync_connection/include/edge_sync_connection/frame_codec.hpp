@@ -16,11 +16,13 @@ ByteBuffer encode_frame(const ByteBuffer& payload);
 // Incremental decoder. Feed raw bytes as they arrive; complete frames are
 // appended to `out` in arrival order. Survives partial/multiple frames per feed.
 class FrameDecoder {
-public:
+   public:
     void feed(const std::uint8_t* data, std::size_t size, std::vector<ByteBuffer>& out);
-    void reset() { buffer_.clear(); }
+    void reset() {
+        buffer_.clear();
+    }
 
-private:
+   private:
     ByteBuffer buffer_;
 };
 

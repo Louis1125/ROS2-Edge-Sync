@@ -12,7 +12,7 @@ namespace edge_sync::storage {
 // once under <root>/<aa>/<full-hash> and are immutable, so identical content is
 // stored exactly once.
 class ObjectStore : public edge_sync::core::IChunkProvider {
-public:
+   public:
     explicit ObjectStore(std::string root);
 
     edge_sync::base::Result<void> initialize();
@@ -23,7 +23,7 @@ public:
     edge_sync::base::Result<edge_sync::base::ByteBuffer> get_chunk(
         const edge_sync::base::Hash& hash) override;
 
-private:
+   private:
     [[nodiscard]] std::string path_for(const edge_sync::base::Hash& hash) const;
 
     std::string root_;

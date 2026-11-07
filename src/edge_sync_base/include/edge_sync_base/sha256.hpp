@@ -9,13 +9,13 @@ namespace edge_sync::base {
 
 // Incremental SHA-256. Feed bytes with update(); call final_hex() once.
 class Sha256 {
-public:
+   public:
     Sha256();
 
     void update(const std::uint8_t* data, std::size_t size);
     Hash final_hex();
 
-private:
+   private:
     void transform_block(const std::uint8_t* block);
 
     std::uint32_t h_[8];

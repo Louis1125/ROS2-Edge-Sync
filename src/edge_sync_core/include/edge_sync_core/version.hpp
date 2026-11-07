@@ -7,6 +7,6 @@ namespace edge_sync::core {
 enum class VersionOrder { Older, Equal, Newer, Conflicting };
 
 VersionOrder compare_versions(const edge_sync::base::Version& lhs,
-                             const edge_sync::base::Version& rhs);
+                              const edge_sync::base::Version& rhs);
 
 }  // namespace edge_sync::core

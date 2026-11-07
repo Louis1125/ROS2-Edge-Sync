@@ -12,7 +12,8 @@ edge_sync::base::Result<void> AgentGateway::start(std::uint16_t port,
     connections_ = std::make_unique<edge_sync::connection::ConnectionManager>(
         std::make_unique<edge_sync::connection::TcpTransport>(), logger_);
     connections_->set_local_identity("control-plane");
-    if (!fleet_secret.empty()) connections_->set_shared_secret(fleet_secret);
+    if (!fleet_secret.empty())
+        connections_->set_shared_secret(fleet_secret);
 
     connections_->set_peer_event_handler(
         [this](const std::string& robot_id) { on_peer_connected(robot_id); },
@@ -21,7 +22,8 @@ edge_sync::base::Result<void> AgentGateway::start(std::uint16_t port,
         [this](const edge_sync::connection::Peer& peer,
                const edge_sync::protocol::MessageEnvelope& env) { on_message(peer, env); });
 
-    if (auto r = connections_->start({"0.0.0.0", port}); !r) return r.error();
+    if (auto r = connections_->start({"0.0.0.0", port}); !r)
+        return r.error();
 
     dispatcher_ = std::jthread([this](std::stop_token stop) { dispatcher_loop(stop); });
     logger_.log(edge_sync::base::LogLevel::Info,
@@ -30,12 +32,14 @@ edge_sync::base::Result<void> AgentGateway::start(std::uint16_t port,
 }
 
 void AgentGateway::stop() {
-    if (stopping_.exchange(true)) return;
+    if (stopping_.exchange(true))
+        return;
     if (dispatcher_.joinable()) {
         dispatcher_.request_stop();
         dispatcher_.join();
     }
-    if (connections_) connections_->stop();
+    if (connections_)
+        connections_->stop();
 }
 
 void AgentGateway::on_peer_connected(const std::string& robot_id) {
@@ -54,7 +58,8 @@ void AgentGateway::on_message(const edge_sync::connection::Peer& peer,
         db_.touch_robot(peer.identity.robot_id);
         return;
     }
-    if (!env.has_sync_status_report()) return;
+    if (!env.has_sync_status_report())
+        return;
     const auto& report = env.sync_status_report();
     const auto status = report.status();
     logger_.log(edge_sync::base::LogLevel::Info,
@@ -73,7 +78,8 @@ void AgentGateway::dispatcher_loop(std::stop_token stop) {
         auto entries = db_.poll_outbox();
         if (entries.ok()) {
             for (const auto& e : entries.value()) {
-                if (!connections_ || !connections_->is_connected(e.target_robot)) continue;
+                if (!connections_ || !connections_->is_connected(e.target_robot))
+                    continue;
                 edge_sync::protocol::MessageEnvelope cmd;
                 cmd.set_protocol_version(edge_sync::protocol::kProtocolVersion);
                 cmd.mutable_sync_command()->set_command_id(e.command_id);

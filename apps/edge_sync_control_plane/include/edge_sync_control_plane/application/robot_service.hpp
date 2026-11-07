@@ -9,12 +9,14 @@
 namespace edge_sync::control_plane {
 
 class RobotService {
-public:
+   public:
     explicit RobotService(Database& db) : db_(db) {}
 
-    edge_sync::base::Result<std::vector<RobotRecord>> list() { return db_.list_robots(); }
+    edge_sync::base::Result<std::vector<RobotRecord>> list() {
+        return db_.list_robots();
+    }
 
-private:
+   private:
     Database& db_;
 };
 

@@ -8,19 +8,26 @@ namespace edge_sync::base {
 namespace {
 const char* level_name(LogLevel level) {
     switch (level) {
-        case LogLevel::Trace: return "TRACE";
-        case LogLevel::Debug: return "DEBUG";
-        case LogLevel::Info: return "INFO";
-        case LogLevel::Warn: return "WARN";
-        case LogLevel::Error: return "ERROR";
-        case LogLevel::Critical: return "CRITICAL";
+        case LogLevel::Trace:
+            return "TRACE";
+        case LogLevel::Debug:
+            return "DEBUG";
+        case LogLevel::Info:
+            return "INFO";
+        case LogLevel::Warn:
+            return "WARN";
+        case LogLevel::Error:
+            return "ERROR";
+        case LogLevel::Critical:
+            return "CRITICAL";
     }
     return "?";
 }
 }  // namespace
 
 void ConsoleLogger::log(LogLevel level, const std::string& message) {
-    if (level < min_level_) return;
+    if (level < min_level_)
+        return;
 
     const auto now = std::chrono::system_clock::now();
     const auto t = std::chrono::system_clock::to_time_t(now);

@@ -34,19 +34,20 @@ void ArtifactStore::reset_staging(const edge_sync::base::ArtifactId& id,
 edge_sync::base::Result<void> ArtifactStore::stage_chunk(
     const edge_sync::base::ArtifactId& id, const edge_sync::base::Version& version,
     const edge_sync::core::ChunkDescriptor& expected, const edge_sync::base::ByteBuffer& data) {
-    if (staging_id_ != id || !(staging_version_.major == version.major &&
-                               staging_version_.minor == version.minor &&
-                               staging_version_.patch == version.patch)) {
+    if (staging_id_ != id ||
+        !(staging_version_.major == version.major && staging_version_.minor == version.minor &&
+          staging_version_.patch == version.patch)) {
         reset_staging(id, version);
     }
-    if (staged_indices_.count(expected.index)) return {};  // idempotent duplicate
+    if (staged_indices_.count(expected.index))
+        return {};  // idempotent duplicate
 
     if (edge_sync::base::sha256_hex(data) != expected.hash) {
         return edge_sync::base::Error{edge_sync::base::ErrorCode::IntegrityFailure,
-                                      "chunk " + std::to_string(expected.index) +
-                                          " hash mismatch"};
+                                      "chunk " + std::to_string(expected.index) + " hash mismatch"};
     }
-    if (auto r = objects_.put(data); !r) return r.error();
+    if (auto r = objects_.put(data); !r)
+        return r.error();
 
     std::fstream out(staging_path(), std::ios::in | std::ios::out | std::ios::binary);
     if (!out) {
@@ -102,7 +103,9 @@ edge_sync::base::Result<std::optional<edge_sync::base::Version>> ArtifactStore::
     return sqlite_.load_active_version(id);
 }
 
-std::string ArtifactStore::staging_path() const { return root_ + "/staging/" + staging_id_; }
+std::string ArtifactStore::staging_path() const {
+    return root_ + "/staging/" + staging_id_;
+}
 
 std::string ArtifactStore::active_path(const edge_sync::base::ArtifactId& id) const {
     return root_ + "/active/" + id;

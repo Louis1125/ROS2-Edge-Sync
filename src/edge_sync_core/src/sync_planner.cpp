@@ -38,8 +38,10 @@ edge_sync::base::Result<SyncPlan> SyncPlanner::plan(const std::optional<Manifest
 
     std::set<edge_sync::base::Hash> needed;
     for (const auto& c : remote.chunks) {
-        if (present.count(c.hash)) continue;   // duplicate / already-present content
-        if (needed.count(c.hash)) continue;    // dedup identical chunks
+        if (present.count(c.hash))
+            continue;  // duplicate / already-present content
+        if (needed.count(c.hash))
+            continue;  // dedup identical chunks
         needed.insert(c.hash);
         plan.needed_chunks.push_back(c);
     }

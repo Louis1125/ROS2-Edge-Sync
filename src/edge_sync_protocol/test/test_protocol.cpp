@@ -2,8 +2,8 @@
 
 #include "edge_sync_protocol/message_codec.hpp"
 
-using edge_sync::protocol::MessageEnvelope;
 using edge_sync::protocol::kProtocolVersion;
+using edge_sync::protocol::MessageEnvelope;
 
 TEST(ProtocolTest, HandshakeRoundTrip) {
     MessageEnvelope in;
