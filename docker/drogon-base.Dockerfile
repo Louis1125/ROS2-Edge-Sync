@@ -10,9 +10,11 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     libsqlite3-dev libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone --depth 1 --recurse-submodules https://github.com/drogonframework/drogon.git /opt/drogon-src \
+RUN git clone --depth 1 https://github.com/drogonframework/drogon.git /opt/drogon-src \
     && cd /opt/drogon-src \
-    && git checkout "${DROGON_REF}" \
+    && git fetch --depth 1 origin "${DROGON_REF}" \
+    && git checkout FETCH_HEAD \
+    && git submodule update --init --recursive --depth 1 \
     && cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${DROGON_PREFIX}" \
     && cmake --build build -j"$(nproc)" \
     && cmake --install build \
