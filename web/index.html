@@ -3,20 +3,28 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
     <title>ROS2-Edge-Sync</title>
-    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('edge-sync-theme');
+          if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
     <link rel="stylesheet" href="/src/styles/tokens.css" />
     <link rel="stylesheet" href="/src/styles/layout.css" />
   </head>
   <body>
     <header class="topbar">
-      <h1>ROS2-Edge-Sync</h1>
-      <nav>
-        <a href="/#dashboard" data-route="dashboard">Dashboard</a>
-        <a href="/#robots" data-route="robots">Robots</a>
-        <a href="/#artifacts" data-route="artifacts">Artifacts</a>
-        <a href="/#sync-jobs" data-route="sync-jobs">Sync Jobs</a>
+      <a class="brand" href="#dashboard"><span class="brand-mark" aria-hidden="true"></span>ROS2-Edge-Sync</a>
+      <nav aria-label="Primary">
+        <a class="nav-link" href="#dashboard" data-route="dashboard">Dashboard</a>
+        <a class="nav-link" href="#robots" data-route="robots">Robots</a>
+        <a class="nav-link" href="#sync-jobs" data-route="sync-jobs">Sync Jobs</a>
       </nav>
+      <button type="button" id="theme-toggle" class="theme-btn" aria-label="Theme: System">Theme: System</button>
     </header>
     <main id="view"><p>Loading…</p></main>
     <script type="module" src="/src/main.ts"></script>
