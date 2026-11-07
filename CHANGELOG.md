@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- K3s functional acceptance: two-agent sync, restart recovery, network interruption, Helm upgrade/rollback, and PostgreSQL backup/restore all pass on a real k3d cluster (see docs/release/K3S_ACCEPTANCE.md).
+
+
 - Unified `./edge-sync` CLI (up/down/status/doctor) with staged progress and URL discovery.
 - Robot heartbeat with online/offline state.
 - Bearer-token API authentication.
