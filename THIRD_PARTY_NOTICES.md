@@ -36,7 +36,6 @@ dependency).
 
 | Dependency | Version | SPDX |
 |---|---|---|
-| htmx.org | 2.0.4 | 0BSD |
 | vite | 5.4.10 | MIT (dev) |
 | typescript | 5.6.3 | Apache-2.0 (dev) |
 
