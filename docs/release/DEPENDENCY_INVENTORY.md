@@ -36,7 +36,6 @@ licences and are relevant only if redistributed:
 
 | Name | Version | Source | SPDX | Usage |
 |---|---|---|---|---|
-| htmx.org | 2.0.4 | bigskysoftware/htmx | 0BSD | runtime |
 | vite | 5.4.10 | vitejs/vite | MIT | dev |
 | typescript | 5.6.3 | microsoft/TypeScript | Apache-2.0 | dev |
 
@@ -70,7 +69,7 @@ build-time tooling, not redistributed runtime components.
 
 ## Verification sources
 
-- Licenses for htmx, Drogon, and trantor were read from their upstream
+- Licenses for Drogon and trantor were read from their upstream
   `LICENSE`/`License` files at the pinned revisions (2026-11-07).
 - Other SPDX identifiers are from the respective project documentation and are
   not independently re-verified line-by-line.

@@ -20,7 +20,6 @@
     { "name": "brotli", "SPDXID": "SPDXRef-brotli", "versionInfo": "1.0", "licenseConcluded": "MIT", "downloadLocation": "https://github.com/google/brotli" },
     { "name": "libpq", "SPDXID": "SPDXRef-libpq", "versionInfo": "14", "licenseConcluded": "PostgreSQL", "downloadLocation": "https://www.postgresql.org/" },
     { "name": "googletest", "SPDXID": "SPDXRef-googletest", "versionInfo": "1.11", "licenseConcluded": "BSD-3-Clause", "downloadLocation": "https://github.com/google/googletest" },
-    { "name": "htmx.org", "SPDXID": "SPDXRef-htmx", "versionInfo": "2.0.4", "licenseConcluded": "0BSD", "downloadLocation": "https://github.com/bigskysoftware/htmx" },
     { "name": "vite", "SPDXID": "SPDXRef-vite", "versionInfo": "5.4.10", "licenseConcluded": "MIT", "downloadLocation": "https://github.com/vitejs/vite" },
     { "name": "typescript", "SPDXID": "SPDXRef-typescript", "versionInfo": "5.6.3", "licenseConcluded": "Apache-2.0", "downloadLocation": "https://github.com/microsoft/TypeScript" }
   ]
